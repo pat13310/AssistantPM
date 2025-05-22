@@ -291,7 +291,7 @@ class DocumentationWidget(QWidget):
             text=self.doc_type.value,
             icon_name=icon_name,
             color="#03b541",  # Couleur verte
-            font_size=20,
+            font_size=16,
             icon_size=24
         )
         

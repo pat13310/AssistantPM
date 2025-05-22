@@ -1,11 +1,16 @@
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame
-)
-from PySide6.QtCore import Qt, QDateTime, QLocale, Signal
+import os
 import sqlite3
+
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame
+)
+from PySide6.QtCore import Qt, QDateTime, QLocale, Signal, QSize
+from PySide6.QtSvgWidgets import QSvgWidget
 
 from project.dashboard.CardProject import CardProject
 from components.layout.FlowLayout import FlowLayout  # ton layout fluide
+from ui.ui_utils import load_colored_svg
+from components.ui.IconWithText import IconWithText
 
 
 class ProjectDashboard(QWidget):
@@ -26,9 +31,17 @@ class ProjectDashboard(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(0)
 
-        title = QLabel("<h4>📁 Projets récents</h4>")
-        title.setStyleSheet("color: #777; font-size: 12pt;margin-bottom: 8px;")
-        layout.addWidget(title)
+        # Utiliser le composant IconWithText pour le titre
+        title_component = IconWithText(
+            text="<h4>Projets récents</h4>",
+            icon_name="boxes",
+            color="#03b541",  # Couleur verte
+            font_size=14,
+            icon_size=24
+        )
+        
+        # Ajouter le composant au layout principal
+        layout.addWidget(title_component)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)

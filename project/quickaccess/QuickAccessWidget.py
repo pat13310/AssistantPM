@@ -50,23 +50,39 @@ class QuickAccessWidget(QWidget):
             }
         """)
         header_layout = QHBoxLayout(header_frame)
-        header_layout.setContentsMargins(20, 20, 20, 20)
+        header_layout.setContentsMargins(15,15, 15, 15)
         header_layout.setSpacing(15)
         
-        # Utiliser un QLabel avec une couleur de fond transparente pour l'icône
-        icon_label = QLabel()
-        icon_label.setFixedSize(48, 48)
+        # Utiliser un widget SVG pour l'icône
+        from ui.ui_utils import load_colored_svg
         
-        # Utiliser un texte simple comme icône
-        icon_label.setText("P")
-        icon_label.setFont(QFont("Segoe UI", 28, QFont.Bold))
-        icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setStyleSheet("color: #22c55e; background-color: #e6f7e6; border-radius: 24px; border: 2px solid #86efac;")
-            
-        header_layout.addWidget(icon_label)
+        # Chemin vers le fichier SVG
+        icon_path = os.path.join(PROJECT_ROOT, "assets", "icons", "boxes.svg")
+        
+        # Créer un conteneur pour l'icône
+        icon_container = QWidget()
+        icon_container.setFixedSize(48, 48)
+        icon_container.setStyleSheet("background-color: #e6f7e6; border: none;")
+        
+        # Layout pour centrer l'icône
+        icon_layout = QVBoxLayout(icon_container)
+        icon_layout.setContentsMargins(8, 8, 8, 8)  # Marges pour que l'icône ne touche pas les bords
+        icon_layout.setAlignment(Qt.AlignCenter)
+        
+        # Créer un widget SVG coloré en vert
+        svg_data = load_colored_svg(icon_path, "#22c55e")  # Couleur verte
+        icon_widget = QSvgWidget()
+        icon_widget.load(svg_data)
+        icon_widget.setFixedSize(28, 28)  # Taille de l'icône
+        
+        # Ajouter l'icône au conteneur
+        icon_layout.addWidget(icon_widget)
+        
+        # Ajouter le conteneur au layout de l'en-tête
+        header_layout.addWidget(icon_container)
         
         # Titre du projet en vert
-        self.project_title = QLabel(f"Accès Rapide" + (f" - {project_name}" if project_name else ""))
+        self.project_title = QLabel(f"Accès Rapide - Projet  " + (f"{project_name}" if project_name else ""))
         self.project_title.setFont(QFont("Segoe UI", 20, QFont.Bold))
         self.project_title.setStyleSheet("color: #22c55e; margin-left: 10px; border:none;")
         header_layout.addWidget(self.project_title)
@@ -181,7 +197,7 @@ class QuickAccessWidget(QWidget):
     def set_project(self, project_name):
         """Définit le projet actif"""
         self.project_name = project_name
-        self.project_title.setText(f"Accès Rapide - {project_name}")
+        self.project_title.setText(f"Accès Rapide du Projet : '{project_name}'")
         
         # Rafraîchir l'interface
         self.update()

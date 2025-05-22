@@ -1,14 +1,47 @@
 import weakref
 import os
+import sys
+
+# Ajouter le chemin racine du projet au sys.path pour les imports
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir, os.pardir))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QSizePolicy, QGraphicsDropShadowEffect # QFrame retiré
 )
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtCore import (
-    Qt, QTimer, QRect, QObject, QSize, Signal
+    Qt, QTimer, QRect, QObject, QSize, Signal, QByteArray
 )
-from PySide6.QtGui import QFont, QEnterEvent
+from PySide6.QtGui import QFont, QEnterEvent, QColor
+
+# Importer le composant IconWithText
+from components.ui.IconWithText import IconWithText
+
+# Importer la fonction load_colored_svg une seule fois
+try:
+    from ui.ui_utils import load_colored_svg
+except ImportError:
+    # Fonction de secours si l'import échoue
+    def load_colored_svg(path: str, color_str: str = None) -> QByteArray:
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                svg_text = f.read()
+        except FileNotFoundError:
+            print(f"[Erreur] Fichier SVG non trouvé: {path}")
+            return QByteArray()
+
+        if color_str:
+            svg_text = svg_text.replace('fill="black"', 'fill="currentColor"')
+            svg_text = svg_text.replace('fill="#000000"', 'fill="currentColor"')
+            svg_text = svg_text.replace('stroke="black"', 'stroke="currentColor"')
+            svg_text = svg_text.replace('stroke="#000000"', 'stroke="currentColor"')
+            svg_text = svg_text.replace("currentColor", color_str)
+
+        return QByteArray(svg_text.encode("utf-8"))
 
 
 # Classe pour stocker les données du projet
@@ -59,11 +92,21 @@ class CardProject(QWidget, QObject):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20) # Marges externes de la carte
         layout.setSpacing(8) # Espacement vertical réduit entre les éléments
-
-        self.title_label = QLabel(f"<b>{title}</b>")
-        self.title_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        self.title_label.setStyleSheet("color: #222; border: none;")
-        layout.addWidget(self.title_label)
+        
+        # Utiliser le composant IconWithText pour le titre avec l'icône
+        title_component = IconWithText(
+            text=title,
+            icon_name="presentation",
+            color="#03b541",  # Couleur verte
+            font_size=12,
+            icon_size=20
+        )
+        
+        # Stocker une référence au label du titre pour pouvoir le mettre à jour si nécessaire
+        self.title_label = title_component.text_label
+        
+        # Ajouter le composant au layout principal
+        layout.addWidget(title_component)
 
         self.desc_label = QLabel(description)
         self.desc_label.setStyleSheet("color: #555; border: none;")
@@ -98,8 +141,7 @@ class CardProject(QWidget, QObject):
             "rocket.svg"          # deployment_info_generated
         ]
 
-        # Importer la fonction utilitaire
-        from ui.ui_utils import load_colored_svg
+        # La fonction load_colored_svg est déjà importée au début du fichier
 
         for i, state in enumerate(project_states):
             svg_widget = QSvgWidget()

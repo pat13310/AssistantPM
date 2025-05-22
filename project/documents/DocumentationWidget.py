@@ -46,7 +46,7 @@ from PySide6.QtWebEngineCore import (
 
 from project.documents.toc import TOC_STRUCTURE
 from project.documents.DocType import DocType
-from components.widgets.HeaderTitle import HeaderTitle
+from components.ui.IconWithText import IconWithText
 from agent.OpenAIGenerationTask import OpenAIGenerationTask
 from agent.OpenAIStreamingTask import OpenAIStreamingTask
 from services.html_renderer import render_html
@@ -274,15 +274,28 @@ class DocumentationWidget(QWidget):
         self.setup_statusbar()
 
     def setup_header(self):
+        # Correspondance entre les types de documents et les noms des icônes SVG
         icon_map = {
-            "CAHIER_DES_CHARGES_FONCTIONNEL": "assets/icons/list-checks.svg",
-            "SPECIFICATIONS_FONCTIONNELLES_DETAILLEES": "assets/icons/layers.svg",
-            "SPECIFICATIONS_TECHNIQUES_DETAILLEES": "assets/icons/code.svg",
-            "STRATEGIE_DE_TESTS_ET_RECETTE": "assets/icons/test-tube.svg",
-            "DOSSIER_ARCHITECTURE_TECHNIQUE": "assets/icons/rocket.svg",
+            "CAHIER_DES_CHARGES_FONCTIONNEL": "list-checks",
+            "SPECIFICATIONS_FONCTIONNELLES_DETAILLEES": "layers",
+            "SPECIFICATIONS_TECHNIQUES_DETAILLEES": "code",
+            "STRATEGIE_DE_TESTS_ET_RECETTE": "test-tube",
+            "DOSSIER_ARCHITECTURE_TECHNIQUE": "rocket",
         }
-        icon_path = icon_map.get(self.doc_type.name, "assets/icons/book-open.svg")
-        header = HeaderTitle(title=self.doc_type.value, icon_path=icon_path)
+        
+        # Obtenir le nom de l'icône correspondant au type de document
+        icon_name = icon_map.get(self.doc_type.name, "book-open")
+        
+        # Créer le composant IconWithText avec l'icône et le titre en vert
+        header = IconWithText(
+            text=self.doc_type.value,
+            icon_name=icon_name,
+            color="#03b541",  # Couleur verte
+            font_size=20,
+            icon_size=24
+        )
+        
+        # Ajouter le composant au layout principal
         self.layout.addWidget(header)
     
     def setup_toolbar(self):

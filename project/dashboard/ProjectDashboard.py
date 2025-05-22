@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame
 )
-from PySide6.QtCore import Qt, QDateTime, QLocale
+from PySide6.QtCore import Qt, QDateTime, QLocale, Signal
 import sqlite3
 
 from project.dashboard.CardProject import CardProject
@@ -9,6 +9,8 @@ from components.layout.FlowLayout import FlowLayout  # ton layout fluide
 
 
 class ProjectDashboard(QWidget):
+    # Signal émis lorsqu'un projet est sélectionné, avec l'ID du projet
+    project_selected = Signal(int)
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("ProjectDashboard")
@@ -89,7 +91,7 @@ class ProjectDashboard(QWidget):
         self.load_projects()
 
     def load_projects(self):
-        self.cursor.execute("SELECT Nom, Description, Date_Creation, markdown_generated, docs_generated, tree_generated, source_code_generated, tests_generated,deployment_info_generated FROM Project")
+        self.cursor.execute("SELECT ID, Nom, Description, Date_Creation, markdown_generated, docs_generated, tree_generated, source_code_generated, tests_generated, deployment_info_generated FROM Project")
         self.projects = self.cursor.fetchall()
         self.display_projects()
 
@@ -110,6 +112,7 @@ class ProjectDashboard(QWidget):
 
         locale_fr = QLocale(QLocale.French)
         for i, (
+            project_id,
             title, 
             desc, 
             created_raw, 
@@ -128,9 +131,40 @@ class ProjectDashboard(QWidget):
             # Par exemple, 5 phases, avec des états True (complété) ou False (non complété)
             # Pour varier l'affichage, on peut utiliser l'index i
             project_states_dummy = [markdown_generated, docs_generated, tree_generated, source_code_generated, tests_generated, deployment_infos_generated]
-            card = CardProject(title, desc, created_str, project_states_dummy)
+            card = CardProject(title, desc, created_str, project_states_dummy, project_id)
+            # Connecter le signal project_data_clicked de la carte à notre méthode de navigation
+            card.project_data_clicked.connect(self.navigate_to_project_data)
+            # Garder aussi l'ancien signal pour la compatibilité
+            card.clicked.connect(self.navigate_to_project)
             self.content_layout.addWidget(card)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.display_projects()
+        
+    def navigate_to_project(self, project_title):
+        """Méthode appelée lorsqu'une carte projet est cliquée (ancienne méthode)"""
+        print(f"Navigation vers le projet: {project_title}")
+        
+        # Récupérer l'ID du projet à partir de son titre
+        self.cursor.execute("SELECT ID FROM Project WHERE Nom = ?", (project_title,))
+        result = self.cursor.fetchone()
+        if result:
+            project_id = result[0]
+            print(f"ID du projet: {project_id}")
+            
+            # Émettre un signal pour indiquer qu'un projet a été sélectionné
+            # Ce signal sera capturé par la fenêtre principale pour changer de vue
+            self.project_selected.emit(project_id)
+            
+    def navigate_to_project_data(self, project_data):
+        """Nouvelle méthode appelée lorsqu'une carte projet est cliquée avec toutes les données"""
+        print(f"Navigation vers le projet: {project_data.title} (ID: {project_data.id})")
+        
+        # Émettre un signal pour indiquer qu'un projet a été sélectionné
+        # Ce signal sera capturé par la fenêtre principale pour changer de vue
+        if project_data.id:
+            self.project_selected.emit(project_data.id)
+            
+            # Pour l'instant, nous allons simplement afficher un message
+            # Vous devrez implémenter la navigation réelle en fonction de votre architecture d'application

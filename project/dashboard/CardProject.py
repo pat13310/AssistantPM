@@ -6,15 +6,40 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtCore import (
-    Qt, QTimer, QRect, QObject, QSize
+    Qt, QTimer, QRect, QObject, QSize, Signal
 )
 from PySide6.QtGui import QFont, QEnterEvent
 
 
+# Classe pour stocker les données du projet
+class ProjectData:
+    def __init__(self, id=None, title="", description="", created_date="", states=None):
+        self.id = id
+        self.title = title
+        self.description = description
+        self.created_date = created_date
+        self.states = states or []
+
+
 class CardProject(QWidget, QObject):
 
-    def __init__(self, title: str, description: str, created: str, project_states: list):
+    # Signal pour indiquer qu'une carte a été cliquée, avec le titre du projet
+    clicked = Signal(str)
+    
+    # Nouveau signal pour émettre toutes les données du projet
+    project_data_clicked = Signal(object)
+
+    def __init__(self, title: str, description: str, created: str, project_states: list, project_id=None):
         super().__init__()
+        
+        # Stocker les données du projet dans un objet ProjectData
+        self.project_data = ProjectData(
+            id=project_id,
+            title=title,
+            description=description,
+            created_date=created,
+            states=project_states
+        )
 
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setMouseTracking(True)
@@ -143,4 +168,11 @@ class CardProject(QWidget, QObject):
     def mousePressEvent(self, event):
         # Gérer le clic sur la carte ici
         print(f"Card clicked: {self.title_label.text()}")
+        
+        # Émettre le signal avec le titre du projet pour la compatibilité avec le code existant
+        self.clicked.emit(self.title_label.text().replace('<b>', '').replace('</b>', ''))
+        
+        # Émettre le signal avec toutes les données du projet
+        self.project_data_clicked.emit(self.project_data)
+        
         super().mousePressEvent(event)

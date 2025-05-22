@@ -19,13 +19,13 @@ class QuickAccessItemCard(QWidget):
     clicked = Signal()
 
     # Styles généraux (version utilisateur)
-    ICON_SIZE = QSize(24, 24)
-    ICON_BLOCK_WIDTH = 44
-    CARD_HEIGHT = 48
-    CARD_FIXED_WIDTH = 220 # Largeur fixe pour les cards
-    BORDER_RADIUS = 6
-    SPACING = 3 # Espacement entre bloc icône et bloc texte
-    TEXT_PADDING = 10 # Padding horizontal à l'intérieur du bloc texte
+    ICON_SIZE = QSize(32, 32)
+    ICON_BLOCK_WIDTH = 60
+    CARD_HEIGHT = 90  # Augmentation de la hauteur des cartes pour accommoder le texte explicatif
+    CARD_FIXED_WIDTH = 370 # Largeur fixe pour les cards
+    BORDER_RADIUS = 8
+    SPACING = 5 # Espacement entre bloc icône et bloc texte
+    TEXT_PADDING = 12 # Padding horizontal à l'intérieur du bloc texte
 
     # Couleurs (version utilisateur)
     COLOR_TEXT_DEFAULT = QColor("#555")
@@ -43,10 +43,11 @@ class QuickAccessItemCard(QWidget):
     COLOR_ICON_HOVER = QColor("#22C55E")
     COLOR_ICON_PRESSED = QColor("#15803D")
 
-    def __init__(self, text: str, icon_path: str = None, parent=None):
+    def __init__(self, text: str, icon_path: str = None, description: str = None, parent=None):
         super().__init__(parent)
-        self.text_content = text # Renommé par l'utilisateur en self.text, je remets self.text_content pour éviter conflit
-        self.icon_path_str = icon_path # Renommé par l'utilisateur en self.icon_path
+        self.text_content = text # Titre principal de la carte
+        self.description = description or "" # Texte explicatif sous le titre
+        self.icon_path_str = icon_path # Chemin de l'icône
         self._hovered = False
         self._pressed = False
 
@@ -128,21 +129,37 @@ class QuickAccessItemCard(QWidget):
             target_rect = QRectF(icon_display_x, icon_display_y, self.ICON_SIZE.width(), self.ICON_SIZE.height())
             renderer.render(painter, target_rect)
 
-        # Texte
+        # Texte principal (titre)
         painter.setPen(text_color)
-        painter.setFont(self.font()) # Utiliser la police définie sur le widget
+        painter.setFont(QFont("Segoe UI", 11, QFont.Bold)) # Police en gras pour le titre
         
         # Rectangle pour le texte, à droite du bloc icône
         text_rect_x = self.ICON_BLOCK_WIDTH + self.SPACING
-        # Ajuster pour l'épaisseur de la bordure si on veut l'aligner par rapport au contenu interne
-        # text_rect_x += border_thickness / 2 
         
-        text_render_rect = QRect(
+        # Rectangle pour le titre (moitié supérieure)
+        title_render_rect = QRect(
             int(text_rect_x), 0, # X commence après le bloc icône et l'espacement
-            int(self.width() - text_rect_x), int(self.height()) # Largeur jusqu'au bord droit, hauteur totale
-        ).adjusted(self.TEXT_PADDING, 0, -self.TEXT_PADDING, 0) # Padding horizontal interne au bloc texte
+            int(self.width() - text_rect_x), int(self.height() / 2) # Moitié supérieure de la carte
+        ).adjusted(self.TEXT_PADDING, 5, -self.TEXT_PADDING, 0) # Padding horizontal et ajustement vertical
         
-        painter.drawText(text_render_rect, Qt.AlignVCenter | Qt.AlignLeft, self.text_content) # Utiliser self.text_content
+        painter.drawText(title_render_rect, Qt.AlignBottom | Qt.AlignLeft, self.text_content)
+        
+        # Texte secondaire (description)
+        if self.description:
+            painter.setPen(QColor("#777777")) # Couleur plus claire pour la description
+            painter.setFont(QFont("Segoe UI", 9)) # Police plus petite pour la description
+            
+            # Rectangle pour la description (moitié inférieure)
+            desc_render_rect = QRect(
+                int(text_rect_x), int(self.height() / 2), # X comme le titre, Y à mi-hauteur
+                int(self.width() - text_rect_x), int(self.height() / 2) # Moitié inférieure de la carte
+            ).adjusted(self.TEXT_PADDING, 0, -self.TEXT_PADDING, -5) # Padding horizontal et ajustement vertical
+            
+            # Limiter le texte à deux lignes et ajouter des points de suspension si nécessaire
+            fm = QFontMetrics(painter.font())
+            elided_text = fm.elidedText(self.description, Qt.ElideRight, desc_render_rect.width())
+            
+            painter.drawText(desc_render_rect, Qt.AlignTop | Qt.AlignLeft, elided_text)
 
     def sizeHint(self) -> QSize:
         fm = QFontMetrics(self.font())

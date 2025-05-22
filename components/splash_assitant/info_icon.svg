@@ -1,0 +1,11 @@
+<!-- fichier info_icon.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+  <style>
+    .info {
+      font-family: 'Lucida Sans Unicode', 'Lucida Grande', sans-serif;
+      font-size: 28px;
+      fill: #3b82f6;
+    }
+  </style>
+  <text x="4" y="26" class="info">ℹ</text>
+</svg>

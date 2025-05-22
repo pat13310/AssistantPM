@@ -1,0 +1,84 @@
+*.env
+.env
+
+# Fichiers Python compilés
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Environnements virtuels
+venv/
+env/
+ENV/
+
+# Fichiers de cache IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Fichiers de logs
+*.log
+logs/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Tous les fichiers volumineux
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.pdf
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.exe
+*.dll
+*.bin
+*.dat
+*.iso
+*.jar
+*.war
+*.ear
+*.jam
+*.msi
+*.img
+*.dmg
+*.psd
+*.ai
+*.tiff
+*.bmp
+*.webp
+*.mp3
+*.wav
+*.ogg
+*.flac
+*.docx
+*.xlsx
+*.pptx
+
+# Dossiers spécifiques
+assets/icons/
+saved_docs/
+
+# Dossiers spécifiques pouvant contenir des fichiers volumineux
+saved_docs/autosave_*
+saved_docs/temp/
+
+# Fichiers de base de données
+*.db
+*.sqlite
+*.sqlite3
+
+# Fichiers temporaires
+*.tmp
+*.temp
+temp/

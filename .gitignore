@@ -73,6 +73,18 @@ saved_docs/
 saved_docs/autosave_*
 saved_docs/temp/
 
+# Fichiers spécifiques à ignorer
+.$Diagramme_DB.drawio.bkp
+Diagramme sans nom.drawio
+Diagramme_DB.drawio
+Moclearn Projet.json
+agent/generated_doc.html
+agent/generated_doc_chapters.html
+agent/sample_project_for_doc_test/
+agent/test_mermaid_isolated.html
+agent/test_template.html
+schema.sql
+
 # Fichiers de base de données
 *.db
 *.sqlite

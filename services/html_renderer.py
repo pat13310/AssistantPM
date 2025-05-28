@@ -392,7 +392,7 @@ def render_html(content, css=None, skip_title=False):
         css = """body, h1, h2, h3, h4, h5, h6 {
             font-family: 'Segoe UI', 'Helvetica', sans-serif;
             line-height: 1.6;
-            color: #333;
+            color: #01bc40;
         }
         
         body {
@@ -415,7 +415,7 @@ def render_html(content, css=None, skip_title=False):
             font-family: 'Segoe UI', 'Helvetica', sans-serif;
             font-size: 1.4em;
             font-weight: 600;
-            color: #444;
+            color: #01bc40;
             margin-bottom: 1em;
             padding-bottom: 0.3em;
             border-bottom: 1px solid #eee;
@@ -521,16 +521,26 @@ def render_html(content, css=None, skip_title=False):
         </div>
         {mermaid_js}
         <script>
-            // Ajuster la taille des icônes SVG dans les titres
+            // Ajuster la taille des icônes SVG dans les titres et partout dans le document
             document.addEventListener('DOMContentLoaded', function() {{
+                // Ajuster tous les SVG du document à 20x20 pixels
+                var allSvgs = document.querySelectorAll('svg');
+                for (var i = 0; i < allSvgs.length; i++) {{
+                    var svg = allSvgs[i];
+                    svg.style.width = '20px';
+                    svg.style.height = '20px';
+                    svg.style.verticalAlign = 'middle';
+                }}
+                
+                // Ajuster spécifiquement les SVG dans les titres
                 var headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
                 for (var i = 0; i < headings.length; i++) {{
                     var heading = headings[i];
-                    // Ajuster la taille des icônes SVG dans les titres
                     var svgs = heading.querySelectorAll('svg');
                     for (var j = 0; j < svgs.length; j++) {{
                         var svg = svgs[j];
-                        svg.style.height = '1.2em';
+                        svg.style.width = '20px';
+                        svg.style.height = '20px';
                         svg.style.verticalAlign = 'middle';
                     }}
                 }}

@@ -361,6 +361,7 @@ if __name__ == "__main__":
     app = QApplication.instance()  # Récupère l'instance existante
     if app is None:  # Crée une nouvelle instance si aucune n'existe
         app = QApplication(sys.argv)
+        app.setStyle("Fusion")  # Appliquer le thème Fusion à toute l'application
 
     while True:  # Boucle de vie de l'application
         print(

@@ -1,0 +1,94 @@
+{
+    "app_types_by_technology": {
+        "Python": [
+            "Application Web",
+            "API REST",
+            "Application Desktop",
+            "Script CLI",
+            "Analyse de données"
+        ],
+        "JavaScript": [
+            "Site Web",
+            "Application SPA",
+            "API REST",
+            "Application Mobile"
+        ],
+        "React": [
+            "Application Web",
+            "Application Mobile",
+            "Dashboard",
+            "E-commerce"
+        ],
+        "C++": [
+            "Application Desktop",
+            "Jeu",
+            "Système embarqué",
+            "Bibliothèque"
+        ],
+        "C#": [
+            "Application Windows",
+            "Application Web ASP.NET",
+            "Jeu Unity",
+            "API REST"
+        ],
+        "Vite": [
+            "Application Vue.js",
+            "Application React",
+            "Site Statique",
+            "PWA"
+        ],
+        "Svelte": [
+            "Application Web",
+            "Application SPA",
+            "Site Statique",
+            "PWA"
+        ]
+    },
+    "features_by_app_type": {
+        "Application Web": [
+            "Authentification",
+            "Base de données",
+            "API REST",
+            "Upload de fichiers",
+            "Thème sombre/clair"
+        ],
+        "API REST": [
+            "Authentification JWT",
+            "Documentation Swagger",
+            "Validation des données",
+            "Cache",
+            "Tests unitaires"
+        ],
+        "Application Desktop": [
+            "Interface graphique",
+            "Persistance des données",
+            "Mises à jour auto",
+            "Thèmes"
+        ],
+        "Application Mobile": [
+            "Navigation",
+            "État global",
+            "Mode hors ligne",
+            "Notifications",
+            "Caméra/Photos"
+        ],
+        "Jeu": [
+            "Moteur physique",
+            "Système de score",
+            "Sauvegarde",
+            "Audio",
+            "Contrôles"
+        ]
+    },
+    "default_features": [
+        "Structure de base",
+        "README",
+        "Tests",
+        "Documentation",
+        "CI/CD"
+    ],
+    "default_app_types": [
+        "Application simple",
+        "Projet de base"
+    ]
+}

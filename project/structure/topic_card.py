@@ -89,13 +89,13 @@ class TopicCard(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         rect = self.rect().adjusted(0, 0, -1, -1)
         
-        # Créer un dégradé plus sophistiqué pour le fond
+        # Créer un dégradé pour le fond
         gradient = QLinearGradient(0, 0, 0, rect.height())
         if self._hovered:
-            # Dégradé plus vif en hover
-            gradient.setColorAt(0, QColor(45, 50, 60, 95))     # Gris-bleu foncé en haut
-            gradient.setColorAt(0.5, QColor(55, 60, 70, 90))   # Gris-bleu moyen au milieu
-            gradient.setColorAt(1, QColor(40, 45, 55, 85))     # Gris-bleu foncé en bas
+            # Dégradé bleu léger en hover
+            gradient.setColorAt(0, QColor(41, 128, 185, 40))    # Bleu clair en haut
+            gradient.setColorAt(0.5, QColor(52, 152, 219, 35))  # Bleu moyen au milieu
+            gradient.setColorAt(1, QColor(41, 128, 185, 30))    # Bleu clair en bas
         else:
             # Dégradé normal plus subtil
             gradient.setColorAt(0, QColor(40, 45, 55, 85))     # Gris-bleu foncé en haut

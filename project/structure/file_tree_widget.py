@@ -30,6 +30,7 @@ from PySide6.QtCore import (
     QSortFilterProxyModel,
     Signal,
     QModelIndex,
+    QTimer,
 )
 from PySide6.QtGui import (
     QColor,
@@ -361,26 +362,21 @@ class FileTreeWidget(QWidget):
         # Création du TreeView pour l'arborescence de fichiers
         self.tree_view = QTreeView()
         self.tree_view.setModel(self.proxy_model)
-        self.tree_view.setAnimated(True)
-        self.tree_view.setHeaderHidden(True)  # Masquer l'en-tête
+        self.tree_view.setAnimated(True) # Conserver l'animation
+        self.tree_view.setHeaderHidden(True)  # S'assurer que l'en-tête est masqué
         self.tree_view.setIndentation(20)
         self.tree_view.setSortingEnabled(True)
         self.tree_view.sortByColumn(0, Qt.AscendingOrder)
         self.tree_view.setEditTriggers(QTreeView.NoEditTriggers)
         self.tree_view.setExpandsOnDoubleClick(True)
         self.tree_view.setSelectionMode(QTreeView.SingleSelection)
-        self.tree_view.setVerticalScrollMode(QTreeView.ScrollPerPixel)
-        self.tree_view.setHorizontalScrollMode(QTreeView.ScrollPerPixel)
         self.tree_view.setUniformRowHeights(True)
-        
-        # Afficher l'en-tête et configurer les colonnes
-        self.tree_view.setHeaderHidden(False)
-        
-        # S'assurer que toutes les colonnes sont visibles
-        for column in range(self.file_system_model.columnCount()):
-            self.tree_view.setColumnWidth(column, 150)  # Largeur par défaut des colonnes
-        
-        # Ajuster la taille de la colonne Nom pour qu'elle soit plus large
+
+        # Masquer toutes les colonnes sauf la première (Nom)
+        for column in range(1, self.file_system_model.columnCount()):
+            self.tree_view.setColumnHidden(column, True)
+
+        # Ajuster la taille de la colonne Nom (la seule visible)
         self.tree_view.setColumnWidth(0, 250)
         
         # Créer et configurer le délégué pour la coloration des dossiers interdits
@@ -508,3 +504,37 @@ class FileTreeWidget(QWidget):
         # Message pour l'utilisateur sur le changement d'affichage
         status = "affichés en rouge" if show_forbidden else "masqués"
         print(f"Répertoires système {status}.")
+
+    def highlight_tree_view(self, flashes=2, duration_on=250, duration_off=250):
+        """Change temporairement le style du TreeView pour attirer l'attention en le faisant clignoter.
+
+        Args:
+            flashes (int): Nombre de fois que l'élément doit clignoter.
+            duration_on (int): Durée en millisecondes de l'état surligné.
+            duration_off (int): Durée en millisecondes de l'état normal entre les surlignages.
+        """
+        if not self.tree_view:
+            return
+
+        original_stylesheet = self.tree_view.styleSheet()
+        highlight_style = "QTreeView { background-color: #4a4a4a; border: 1px solid #35fc84; }" # Gris foncé avec bordure verte
+
+        def _flash(count):
+            if count <= 0:
+                self.tree_view.setStyleSheet(original_stylesheet)
+                return
+
+            # Allumer
+            self.tree_view.setStyleSheet(highlight_style)
+            
+            # Éteindre après duration_on
+            QTimer.singleShot(duration_on, lambda: _turn_off(count))
+
+        def _turn_off(count):
+            self.tree_view.setStyleSheet(original_stylesheet)
+            # Prochain flash après duration_off, si ce n'est pas le dernier "off"
+            if count > 1: # Ne pas relancer de timer si c'est le dernier "off"
+                QTimer.singleShot(duration_off, lambda: _flash(count - 1))
+            # Si count == 1, on vient de faire le dernier "off", donc on s'arrête.
+
+        _flash(flashes)

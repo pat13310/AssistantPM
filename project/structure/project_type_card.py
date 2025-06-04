@@ -42,6 +42,7 @@ class ProjectTypeCard(QWidget):
         
         # Conteneur pour le texte
         text_container = QWidget()
+        text_container.setStyleSheet("background: transparent;") # Assurer la transparence
         text_layout = QVBoxLayout(text_container)
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(2)
@@ -121,6 +122,7 @@ class ProjectTypeCard(QWidget):
                 self.icon_widget = QSvgWidget()
                 self.icon_widget.load(svg_content)
                 self.icon_widget.setFixedSize(24, 24)  # Taille fixe pour l'icône
+                self.icon_widget.setStyleSheet("background: transparent; border: none;") # Assurer la transparence
             else:
                 # Aucune icône trouvée, utiliser un cercle coloré avec la première lettre
                 self.create_letter_icon()

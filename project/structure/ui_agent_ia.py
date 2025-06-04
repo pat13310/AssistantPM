@@ -85,7 +85,7 @@ from action_types import (
 from project_creator import ProjectCreator
 from project_creator_show import ProjectCreatorShow
 # Import du FileTreeWidget depuis le module local
-from project.structure.file_tree_widget import FileTreeWidget
+from project.structure.file_tree_widget import FileTreeWidget, FORBIDDEN_PATHS, SYSTEM_DRIVES
 from project_types_widget import ProjectTypesWidget
 from project_type_card import ProjectTypeCard
 from top_bar_widget import TopBarWidget
@@ -444,6 +444,7 @@ class ChatArboWidget(QWidget):
 
     def on_tree_item_clicked(self, path, is_dir):
         """Gère le clic sur un élément de l'arborescence"""
+        self.clear_bubbles()
         # Stocker le chemin sélectionné pour la création de projet
         self.selected_project_path = path
         # Mettre à jour également path_root pour la génération de squelette d'application
@@ -839,7 +840,8 @@ class ChatArboWidget(QWidget):
         """Affiche les technologies disponibles pour un type de projet en utilisant ProjectTypeCard"""
         # Effacer les bulles de technologies précédentes
         self.clear_tech_bubbles()
-
+        self.clear_bubbles()
+        
         # Ajouter un bouton de retour pour revenir à la sélection des types de projets
         back_button = QPushButton("« Retour aux types de projets")
         back_button.setStyleSheet(
@@ -877,7 +879,7 @@ class ChatArboWidget(QWidget):
         technologies = tech_data["technologies"]
         project_type_name = tech_data["project_type_name"]
         project_color = tech_data["project_color"]
-
+        
         # Créer un message pour introduire les technologies
         intro_bubble = self.add_chat_bubble(
             f"Sélectionnez une technologie pour {project_type_name} :",
@@ -1011,6 +1013,14 @@ class ChatArboWidget(QWidget):
             f"[DEPRECATED] Utiliser on_technology_selected_with_project_type à la place"
         )
         self.on_technology_selected_with_project_type(technology_id, project_type_id)
+        project_type_name = next(
+            (
+                pt["name"]
+                for pt in self.project_show.get_project_types()
+                if pt["id"] == project_type_id
+            ),
+            "Type de projet inconnu", # Valeur par défaut si non trouvé
+        )
         technology_name = next(
             (
                 tech["name"]
@@ -1483,6 +1493,8 @@ class ChatArboWidget(QWidget):
     def handle_topic_selection(self, topic):
         """Gère la sélection d'une rubrique"""
         # Ajouter le choix de l'utilisateur comme message
+        self.clear_bubbles()
+        
         self.add_chat_bubble(
             f"Je souhaite de l'aide sur : {topic}",
             is_user=True,
@@ -1708,6 +1720,8 @@ class ChatArboWidget(QWidget):
         """Affiche les langages de programmation disponibles pour une technologie en utilisant ProjectTypeCard"""
         # Nettoyer les anciennes bulles de langages
         self.clear_language_bubbles()
+        self.clear_bubbles()
+        
 
         # Ajouter un bouton de retour pour revenir à la sélection des technologies
         back_button = QPushButton("« Retour aux technologies")
@@ -2020,7 +2034,7 @@ class ChatArboWidget(QWidget):
                 empty_widget.setStyleSheet("background-color: transparent;")
                 empty_widget.setProperty("project_subtype_bubble", True)
                 grid_layout.addWidget(
-                    empty_widget, row, (total_items % num_columns) + i
+                    empty_widget, row, col + i
                 )
 
         # Ajouter le conteneur au layout principal
@@ -2116,10 +2130,10 @@ class ChatArboWidget(QWidget):
             + f"<b>Technologie :</b> {technology_name}<br>"
             + f"<b>Langage :</b> {language_name}<br>"
             + f"<b>Type spécifique :</b> {subtype_name}",
-            is_user=True,
+            is_user=False   ,
             word_wrap=True,
-            icon_name="check",
-            icon_color="#4CAF50",
+            icon_name="info",
+            icon_color="#FFFFFF",
         )
 
         # Continuer avec la prochaine étape (à définir selon les besoins)
@@ -2189,9 +2203,7 @@ class ChatArboWidget(QWidget):
         # Utiliser la méthode du composant déporté pour mettre à jour l'arborescence
         self.file_tree.update_tree_view_and_select_folder(folder_path)
 
-        # Mettre en évidence visuellement la sélection avec un timer pour éviter l'exécution immédiate
         QTimer.singleShot(100, self.file_tree.highlight_tree_view)
-
     def add_project_name_input(self):
         """Ajoute une bulle interactive pour saisir le nom du projet"""
         # Créer un conteneur pour la bulle
@@ -2426,8 +2438,7 @@ class ChatArboWidget(QWidget):
         if not path:
             return (False, "Le chemin ne peut pas être vide")
         
-        # Importer les listes depuis file_tree_widget.py
-        from .file_tree_widget import FORBIDDEN_PATHS, SYSTEM_DRIVES
+        # Les constantes FORBIDDEN_PATHS et SYSTEM_DRIVES sont maintenant importées en haut du fichier
             
         # Normaliser le chemin pour faciliter la comparaison
         normalized_path = os.path.normpath(path).lower()
@@ -2973,7 +2984,8 @@ class ChatArboWidget(QWidget):
 
     @Slot()
     def filter_files(self, text):
-        """Méthode de compatibilité pour filtrer les fichiers (utiliser file_tree.filter_tree_view à la place)"""
+        """Méthode de compatibilité pour filtrer les fichiers (utilise file_tree.filter_tree_view).
+           La logique de repli ci-dessous est conservée mais devrait utiliser le paramètre 'text'."""
         self.file_tree.filter_tree_view(text)
         # Vérifier si la recherche est vide
         if not text:
@@ -2992,7 +3004,7 @@ class ChatArboWidget(QWidget):
                 file_path = self.model.filePath(child_index).lower()
 
                 # Vérifier si le nom ou le chemin contient le texte de recherche
-                if search_text in file_name or search_text in file_path:
+                if text.lower() in file_name or text.lower() in file_path: # Utiliser text.lower() ici
                     self.tree.setRowHidden(row, parent_index, False)
                     show_parent = True
                 else:

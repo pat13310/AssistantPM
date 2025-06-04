@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QWidget
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QWidget,QSizePolicy
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtSvgWidgets import QSvgWidget
@@ -119,3 +119,4 @@ class ChatBubble(QFrame):
         if not is_user:
             self.setMinimumWidth(300)  # Largeur minimale pour les bulles de l'IA
             self.setMaximumWidth(500)  # Largeur maximale pour éviter que les bulles ne soient trop larges
+            self.setMaximumHeight(120)  # Hauteur maximale pour les bulles de l'IA

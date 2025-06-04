@@ -177,6 +177,7 @@ class MessageInputField(QPlainTextEdit):
 # Import des classes depuis les fichiers séparés
 from project.structure.stream_thread import StreamThread
 from project.structure.conversation_manager import ConversationManager
+from project.structure.connection_worker import ConnectionWorker
 
 
 class ChatArboWidget(QWidget):
@@ -692,16 +693,7 @@ class ChatArboWidget(QWidget):
                     widget.setVisible(False)
                     widget.deleteLater()
 
-    def clear_tech_bubbles(self):
-        """Efface les bulles de technologies précédentes pour éviter les doublons"""
-        # Parcourir tous les widgets dans le chat_layout et supprimer ceux qui contiennent des technologies
-        if hasattr(self, "chat_layout"):
-            for i in range(self.chat_layout.count()):
-                widget = self.chat_layout.itemAt(i).widget()
-                if widget and hasattr(widget, "tech_bubble") and widget.tech_bubble:
-                    widget.setVisible(False)
-                    widget.deleteLater()
-
+    
     def display_project_types(self):
         """Affiche les types de projets disponibles en grille de 4 colonnes avec ProjectTypeCard"""
 
@@ -831,7 +823,8 @@ class ChatArboWidget(QWidget):
         technologies = self.project_show.select_project_type(project_type_id)
 
         # Effacer les messages précédents pour éviter les doublons
-        self.clear_tech_bubbles()
+        self.clear_bubbles()
+
 
         # Afficher les technologies disponibles pour ce type de projet
         self.display_technologies_for_project_type(project_type_id)
@@ -839,29 +832,11 @@ class ChatArboWidget(QWidget):
     def display_technologies_for_project_type(self, project_type_id):
         """Affiche les technologies disponibles pour un type de projet en utilisant ProjectTypeCard"""
         # Effacer les bulles de technologies précédentes
-        self.clear_tech_bubbles()
         self.clear_bubbles()
         
         # Ajouter un bouton de retour pour revenir à la sélection des types de projets
-        back_button = QPushButton("« Retour aux types de projets")
-        back_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #444444;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 15px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #555555;
-            }
-            QPushButton:pressed {
-                background-color: #333333;
-            }
-        """
-        )
+        from project.structure.back_button import BackButton
+        back_button = BackButton("« Retour aux types de projets")
         back_button.clicked.connect(self.handle_back_to_project_types)
 
         # Ajouter le bouton au layout
@@ -1088,25 +1063,35 @@ class ChatArboWidget(QWidget):
     # La méthode reset_status_message a été supprimée car elle faisait double emploi avec check_server_connection
 
     def check_server_connection(self):
-        """Vérifie si le serveur IA est en cours d'exécution et met à jour l'indicateur de statut"""
+        """Démarre un thread pour vérifier la connexion au serveur sans bloquer l'UI"""
+        # Créer un thread pour exécuter la vérification en arrière-plan
+        self.connection_thread = QThread()
+        self.connection_worker = ConnectionWorker("http://localhost:8000/health")
+        self.connection_worker.moveToThread(self.connection_thread)
+        
+        # Connecter les signaux
+        self.connection_thread.started.connect(self.connection_worker.check_connection)
+        self.connection_worker.connection_result.connect(self.handle_connection_result)
+        self.connection_worker.finished.connect(self.connection_thread.quit)
+        self.connection_worker.finished.connect(self.connection_worker.deleteLater)
+        self.connection_thread.finished.connect(self.connection_thread.deleteLater)
+        
+        # Démarrer le thread
+        self.connection_thread.start()
+    
+    def handle_connection_result(self, is_connected, message):
+        """Gère le résultat de la vérification de connexion"""
+        self.server_connected = is_connected
         try:
-            # Tenter une connexion rapide pour vérifier si le serveur est actif
-            response = httpx.get("http://localhost:8000/health", timeout=2.0)
-            if response.status_code == 200:
-                self.server_connected = True
-                # Utiliser la méthode de mise à jour du statut de TopBarWidget
-                self.top_bar.update_connection_status(True, "Connecté au serveur IA")
-                return True
-            else:
-                self.server_connected = False
-                # Utiliser la méthode de mise à jour du statut de TopBarWidget
-                self.top_bar.update_connection_status(False, "Erreur de connexion")
-                return False
-        except Exception:
-            self.server_connected = False
-            # Utiliser la méthode de mise à jour du statut de TopBarWidget
-            self.top_bar.update_connection_status(False, "Serveur IA non disponible")
-            return False
+            if hasattr(self, 'top_bar') and self.top_bar:
+                self.top_bar.update_connection_status(is_connected, message)
+        except RuntimeError:
+            # L'objet a déjà été supprimé, ignorer silencieusement
+            print("Impossible de mettre à jour le statut de connexion : top_bar a été supprimé")
+        except Exception as e:
+            print(f"Erreur lors de la mise à jour du statut de connexion : {e}")
+
+
 
     @Slot()
     def send_message(
@@ -1719,30 +1704,12 @@ class ChatArboWidget(QWidget):
     def display_programming_languages(self, technology_id):
         """Affiche les langages de programmation disponibles pour une technologie en utilisant ProjectTypeCard"""
         # Nettoyer les anciennes bulles de langages
-        self.clear_language_bubbles()
         self.clear_bubbles()
         
 
         # Ajouter un bouton de retour pour revenir à la sélection des technologies
-        back_button = QPushButton("« Retour aux technologies")
-        back_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #444444;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 15px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #555555;
-            }
-            QPushButton:pressed {
-                background-color: #333333;
-            }
-        """
-        )
+        from project.structure.back_button import BackButton
+        back_button = BackButton("« Retour aux technologies")
         back_button.clicked.connect(lambda: self.handle_back_to_technologies())
 
         # Ajouter le bouton au layout
@@ -1921,25 +1888,8 @@ class ChatArboWidget(QWidget):
                 item.widget().deleteLater()
 
         # Ajouter un bouton de retour pour revenir à la sélection des langages
-        back_button = QPushButton("« Retour aux langages")
-        back_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #444444;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 15px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #555555;
-            }
-            QPushButton:pressed {
-                background-color: #333333;
-            }
-        """
-        )
+        from project.structure.back_button import BackButton
+        back_button = BackButton("« Retour aux langages")
         back_button.clicked.connect(
             lambda: self.handle_back_to_languages(technology_id)
         )
@@ -2165,35 +2115,7 @@ class ChatArboWidget(QWidget):
         # On peut l'utiliser pour des actions supplémentaires si nécessaire
         pass
 
-    def generate_app_skeleton(self):
-        """Génère un squelette d'application basé sur les choix de l'utilisateur"""
-        # Cette méthode serait connectée à l'API pour générer le squelette
-        # Pour l'instant, nous affichons simplement un message de confirmation
-        self.add_chat_bubble(
-            "<b>Votre squelette d'application est prêt !</b><br><br>"
-            "J'ai créé une structure de projet basée sur vos choix. "
-            "Vous pouvez maintenant télécharger le code ou continuer à personnaliser votre projet.",
-            is_user=False,
-        )
-        # Demander le nom du projet si ce n'est pas déjà fait
-        if not self.project_name:
-            self.add_chat_bubble(
-                "Avant de finaliser, veuillez indiquer le nom de votre projet :",
-                is_user=False,
-            )
-            # Créer une bulle pour saisir le nom du projet
-            self.input_chat_bubble = InputChatBubble(self)
-            bubble_container = self.input_chat_bubble.add_project_name_input()
-            self.chat_layout.addWidget(bubble_container)
-
-            # Connecter le signal de soumission du nom du projet
-            self.input_chat_bubble.projectNameSubmitted.connect(
-                self.on_project_name_submitted
-            )
-
-            # Faire défiler vers le bas après un court délai
-            QTimer.singleShot(50, self.scroll_to_bottom)
-
+    
     def update_tree_view_and_select_folder(self, folder_path):
         """Met à jour la vue d'arborescence et sélectionne un dossier"""
         if not os.path.exists(folder_path):

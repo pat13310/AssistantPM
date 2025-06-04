@@ -538,3 +538,39 @@ class FileTreeWidget(QWidget):
             # Si count == 1, on vient de faire le dernier "off", donc on s'arrête.
 
         _flash(flashes)
+
+    def update_tree_view_and_select_folder(self, folder_path):
+        """Met à jour l'arborescence et sélectionne un dossier spécifique.
+
+        Cette méthode rafraîchit l'arborescence et sélectionne le dossier spécifié
+        pour mettre en évidence le nouveau dossier créé ou modifié.
+
+        Args:
+            folder_path (str): Chemin complet du dossier à sélectionner
+        """
+        # Vérifier si le chemin existe
+        if not os.path.exists(folder_path):
+            print(f"Le dossier {folder_path} n'existe pas.")
+            return
+            
+        # Définir la racine si nécessaire
+        if self.root_path is None or not folder_path.startswith(self.root_path):
+            # Si le dossier n'est pas dans l'arborescence actuelle, changer la racine
+            self.set_root_path(os.path.dirname(folder_path))
+        
+        # Obtenir l'index du modèle pour le chemin spécifié
+        index = self.file_system_model.index(folder_path)
+        if index.isValid():
+            # Mapper l'index à travers le proxy model
+            proxy_index = self.proxy_model.mapFromSource(index)
+            if proxy_index.isValid():
+                # Sélectionner l'élément dans la vue
+                self.tree_view.setCurrentIndex(proxy_index)
+                # Développer le parent pour montrer l'élément
+                parent = proxy_index.parent()
+                if parent.isValid():
+                    self.tree_view.expand(parent)
+                # Faire défiler pour que l'élément soit visible
+                self.tree_view.scrollTo(proxy_index)
+                # Faire clignoter pour attirer l'attention
+                self.highlight_tree_view()

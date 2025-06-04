@@ -386,12 +386,19 @@ class TopBarWidget(QFrame):
         # Créer un message HTML avec l'emoji approprié
         html_message = f'<span style="font-size: 14px;">{emoji} <b>{display_path}</b></span>'
         
-        # Afficher dans le label de statut
-        self.status_indicator.setText(html_message)
-        self.status_indicator.setStyleSheet("border: none;")
-        
-        # Ajouter un tooltip avec le chemin complet
-        self.status_indicator.setToolTip(full_path)
+        # Afficher dans le label de statut de manière sécurisée
+        try:
+            if hasattr(self, 'status_indicator') and self.status_indicator:
+                self.status_indicator.setText(html_message)
+                self.status_indicator.setStyleSheet("border: none;")
+                
+                # Ajouter un tooltip avec le chemin complet
+                self.status_indicator.setToolTip(full_path)
+        except RuntimeError:
+            # L'objet a déjà été supprimé, ignorer silencieusement
+            print("Impossible de mettre à jour le chemin : le label a été supprimé")
+        except Exception as e:
+            print(f"Erreur lors de la mise à jour du chemin : {e}")
     
     def update_connection_status(self, is_connected, server_url=None):
         """

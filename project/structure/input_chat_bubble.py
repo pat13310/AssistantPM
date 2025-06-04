@@ -5,7 +5,8 @@ from PySide6.QtWidgets import (
     QFrame, 
     QLabel, 
     QLineEdit, 
-    QPushButton
+    QPushButton,
+    QSizePolicy
 )
 from PySide6.QtCore import Qt, QTimer, Signal
 
@@ -101,6 +102,8 @@ class InputChatBubble(QWidget):
         """Ajoute une bulle interactive pour saisir le nom du projet"""
         # Créer un conteneur pour la bulle
         bubble_container = QWidget()
+        # Définir une hauteur maximale fixe pour le conteneur
+        bubble_container.setMaximumHeight(200)  # Limiter explicitement la hauteur
         container_layout = QVBoxLayout(bubble_container)
         container_layout.setContentsMargins(0, 0, 0, 10)
         
@@ -110,6 +113,8 @@ class InputChatBubble(QWidget):
         # Créer un widget pour contenir la bulle avec une largeur limitée
         bubble_wrapper = QWidget()
         bubble_wrapper.setFixedWidth(500)  # Largeur réduite de moitié (environ)
+        # Définir la politique de taille pour limiter la hauteur au contenu
+        bubble_wrapper.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         wrapper_layout = QVBoxLayout(bubble_wrapper)
         wrapper_layout.setContentsMargins(0, 0, 0, 0)
         

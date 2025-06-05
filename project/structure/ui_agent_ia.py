@@ -445,20 +445,22 @@ class ChatArboWidget(QWidget):
 
     def on_tree_item_clicked(self, path, is_dir):
         """Gère le clic sur un élément de l'arborescence"""
-        self.clear_bubbles()
-        # Stocker le chemin sélectionné pour la création de projet
-        self.selected_project_path = path
-        # Mettre à jour également path_root pour la génération de squelette d'application
-        self.path_root = path
+        self.clear_bubbles()        
 
         # Afficher le chemin sélectionné dans la barre d'état
         print(f"Chemin sélectionné: {os.path.basename(path)}")
         # Utiliser la nouvelle méthode pour afficher le chemin sélectionné
-        self.top_bar.update_selected_path(path, is_dir)
+        if not is_dir:
+            # Si c'est un fichier, afficher le chemin du répertoire parent
+            self.top_bar.update_selected_path(os.path.dirname(path), is_dir)
+            self.path_root = os.path.dirname(path) 
+        else:
+            # Si c'est un répertoire, afficher le chemin complet
+            self.top_bar.update_selected_path(path, is_dir)
+            self.path_root = path        
 
-        # Rétablir le message normal après 3 secondes
-        # QTimer.singleShot(3000, self.check_server_connection)
-
+        self.selected_project_path = self.path_root
+        
         # Si on attend la sélection d'un dossier pour la création de projet
         if hasattr(self, "wait_for_path") and self.wait_for_path:
             # Mettre en évidence l'arborescence avec un timer pour éviter l'exécution immédiate

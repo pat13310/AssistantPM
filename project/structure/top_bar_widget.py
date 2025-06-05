@@ -155,19 +155,10 @@ class TopBarWidget(QFrame):
         # Partie gauche : statut de connexion
         status_layout = QHBoxLayout()
 
-        # Icône de statut
-        self.status_icon = QLabel()
-        self.status_icon.setFixedSize(24, 24)
-        self.status_icon.setStyleSheet("border: none; background: transparent;")
-        # Utiliser notre fonction pour charger l'icône SVG
-        disconnect_pixmap = get_svg_icon("server-off", size=24, color="#d32f2f")
-        if disconnect_pixmap:
-            self.status_icon.setPixmap(disconnect_pixmap)
-        status_layout.addWidget(self.status_icon)
 
-        self.status_indicator = QLabel("Non connecté")
+        self.status_indicator = QLabel("")
         self.status_indicator.setStyleSheet(
-            "color: #d32f2f;border: none;"
+            "color: #fff;border: none;"
         )
         status_layout.addWidget(self.status_indicator)
 
@@ -378,7 +369,7 @@ class TopBarWidget(QFrame):
         
         if len(path) <= 3 and (path.endswith(':') or path.endswith(':/') or path.endswith(':\\')):
             display_path = full_path
-            emoji = '💾'  # Emoji disque dur pour les lecteurs
+            emoji = '📁'  # Emoji disque dur pour les lecteurs
         else:
             display_path = os.path.basename(path)
             emoji = '📁' if is_dir else '📄'  # Dossier ou fichier

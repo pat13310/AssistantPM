@@ -23,6 +23,9 @@ from PySide6.QtWidgets import (
     QStyle,
     QFileDialog,
     QFileSystemModel,
+    QMenu,
+    QInputDialog,
+    QMessageBox,
 )
 from PySide6.QtCore import (
     Qt,
@@ -299,9 +302,10 @@ class FileTreeWidget(QWidget):
         self.file_system_model = QFileSystemModel()
         
         # Configuration du modèle de système de fichiers
-        self.file_system_model.setReadOnly(False)
+        self.file_system_model.setReadOnly(False)  # Permettre la modification (création/suppression)
         self.file_system_model.setNameFilterDisables(False)
-        # Afficher les 4 colonnes standard: Nom, Taille, Type, Date de modification
+        
+        # Afficher tous les lecteurs
         self.file_system_model.setRootPath('')
         
         self.proxy_model = ForbiddenPathProxyModel()
@@ -310,9 +314,6 @@ class FileTreeWidget(QWidget):
         self.forbidden_checkbox = None
         self.root_path = None
         self.delegate = None
-        
-        # Configuration du modèle de fichiers
-        self.file_system_model.setReadOnly(True)
         self.file_system_model.setNameFilterDisables(False)
         self.file_system_model.setFilter(QDir.AllDirs | QDir.Files | QDir.NoDotAndDotDot)
         
@@ -371,6 +372,8 @@ class FileTreeWidget(QWidget):
         self.tree_view.setExpandsOnDoubleClick(True)
         self.tree_view.setSelectionMode(QTreeView.SingleSelection)
         self.tree_view.setUniformRowHeights(True)
+        self.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree_view.customContextMenuRequested.connect(self.show_context_menu)
 
         # Masquer toutes les colonnes sauf la première (Nom)
         for column in range(1, self.file_system_model.columnCount()):
@@ -482,6 +485,138 @@ class FileTreeWidget(QWidget):
             self.item_double_clicked.emit(path, is_dir)
             
             print(f"Double-clic sur: {path}")
+    
+    def show_context_menu(self, position):
+        """Affiche le menu contextuel pour l'arborescence
+        
+        Args:
+            position (QPoint): Position du clic droit
+        """
+        # Récupérer l'index sous le curseur
+        index = self.tree_view.indexAt(position)
+        
+        # Vérifier si le clic est sur un élément valide
+        if not index.isValid():
+            # Créer un menu vide pour les clics dans le vide
+            menu = QMenu(self)
+            create_folder_action = menu.addAction("Créer un répertoire")
+            create_folder_action.triggered.connect(lambda: self.create_folder(None))
+            menu.exec_(self.tree_view.viewport().mapToGlobal(position))
+            return
+            
+        # Obtenir le chemin de l'élément sélectionné
+        source_index = self.proxy_model.mapToSource(index)
+        path = self.file_system_model.filePath(source_index)
+        
+        # Vérifier si c'est un dossier ou un fichier
+        is_dir = os.path.isdir(path)
+        
+        # Créer le menu contextuel
+        menu = QMenu(self)
+        
+        # Ajouter les actions au menu contextuel en fonction du type d'élément
+        if is_dir:
+            # Actions pour les répertoires
+            create_folder_action = menu.addAction("Créer un répertoire")
+            create_folder_action.triggered.connect(lambda: self.create_folder(path))
+            
+            delete_folder_action = menu.addAction("Supprimer le répertoire")
+            delete_folder_action.triggered.connect(lambda: self.delete_item(path))
+        else:
+            # Actions pour les fichiers
+            delete_file_action = menu.addAction("Supprimer le fichier")
+            delete_file_action.triggered.connect(lambda: self.delete_item(path))
+        
+        # Afficher le menu à la position du clic droit
+        menu.exec_(self.tree_view.viewport().mapToGlobal(position))
+    
+    def create_folder(self, parent_path):
+        """Crée un nouveau répertoire
+        
+        Args:
+            parent_path (str): Chemin du répertoire parent, ou None si aucun élément sélectionné
+        """
+        # Si pas de chemin parent spécifié, utiliser la racine
+        if not parent_path:
+            if self.root_path:
+                parent_path = self.root_path
+            else:
+                QMessageBox.warning(self, "Erreur", "Aucun répertoire sélectionné ou racine définie")
+                return
+        
+        # Demander le nom du nouveau répertoire
+        folder_name, ok = QInputDialog.getText(
+            self, "Créer un répertoire", "Nom du répertoire:"
+        )
+        
+        if ok and folder_name:
+            # Créer le chemin complet du nouveau répertoire
+            new_folder_path = os.path.join(parent_path, folder_name)
+            
+            # Vérifier si le répertoire existe déjà
+            if os.path.exists(new_folder_path):
+                QMessageBox.warning(self, "Erreur", f"Le répertoire '{folder_name}' existe déjà")
+                return
+            
+            try:
+                # Créer le répertoire
+                os.makedirs(new_folder_path, exist_ok=True)
+                
+                # Rafraîchir la vue et sélectionner le nouveau répertoire
+                self.update_tree_view_and_select_folder(new_folder_path)
+                
+                print(f"Répertoire créé : {new_folder_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Erreur", f"Impossible de créer le répertoire: {str(e)}")
+    
+    def delete_item(self, path):
+        """Supprime un répertoire ou un fichier
+        
+        Args:
+            path (str): Chemin de l'élément à supprimer
+        """
+        if not path or not os.path.exists(path):
+            QMessageBox.warning(self, "Erreur", "Élément inexistant")
+            return
+        
+        is_dir = os.path.isdir(path)
+        item_name = os.path.basename(path)
+        item_type = "répertoire" if is_dir else "fichier"
+        
+        # Demander confirmation avant suppression
+        confirmation = QMessageBox.question(
+            self,
+            "Confirmation de suppression",
+            f"Êtes-vous sûr de vouloir supprimer {item_type} '{item_name}'?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if confirmation == QMessageBox.Yes:
+            try:
+                # Sauvegarder le répertoire parent
+                parent_path = os.path.dirname(path)
+                parent_exists = os.path.exists(parent_path)
+                
+                # Supprimer le répertoire ou fichier
+                if is_dir:
+                    import shutil
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+                
+                # Sélectionner le répertoire parent s'il existe encore
+                # sinon ne pas changer la vue (garder l'affichage des lecteurs)
+                if parent_exists and os.path.exists(parent_path):
+                    self.tree_view.setCurrentIndex(self.proxy_model.mapFromSource(
+                        self.file_system_model.index(parent_path)
+                    ))
+                    # Faire défiler pour que l'élément soit visible
+                    self.tree_view.scrollTo(self.tree_view.currentIndex())
+                
+                print(f"{item_type.capitalize()} supprimé : {path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Erreur", f"Impossible de supprimer {item_type}: {str(e)}")
     
     def on_show_forbidden_changed(self, state):
         """Slot appelé quand l'état de la checkbox des dossiers interdits change

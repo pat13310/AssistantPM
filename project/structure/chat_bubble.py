@@ -119,4 +119,4 @@ class ChatBubble(QFrame):
         if not is_user:
             self.setMinimumWidth(300)  # Largeur minimale pour les bulles de l'IA
             self.setMaximumWidth(500)  # Largeur maximale pour éviter que les bulles ne soient trop larges
-            self.setMaximumHeight(120)  # Hauteur maximale pour les bulles de l'IA
+            # Pas de hauteur maximale pour permettre d'afficher tout le contenu

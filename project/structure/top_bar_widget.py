@@ -169,7 +169,7 @@ class TopBarWidget(QFrame):
         model_layout = QHBoxLayout()
         lb = QLabel("Modèle IA:")
         lb.setStyleSheet(
-            "color: #e0e0e0; font-weight: bold; border: none; background: transparent;"
+            "color: #e0e0e0;border: none; background: transparent;"
         )
         model_layout.addWidget(lb)
         self.model_choice = QComboBox()

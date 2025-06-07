@@ -286,6 +286,10 @@ class FileTreeWidget(QWidget):
     item_double_clicked = Signal(str, bool)  # path, is_dir
     search_text_changed = Signal(str)  # search text
     
+    # Signal pour les opérations sur les fichiers/dossiers (action, path, success, is_dir)
+    # action: string ("create", "delete", etc.), path: string, success: bool, is_dir: bool
+    file_operation = Signal(str, str, bool, bool)
+    
     def __init__(self, parent=None, root_path=None):
         """Initialise le widget d'arborescence
         
@@ -303,7 +307,6 @@ class FileTreeWidget(QWidget):
         
         # Configuration du modèle de système de fichiers
         self.file_system_model.setReadOnly(False)  # Permettre la modification (création/suppression)
-        self.file_system_model.setNameFilterDisables(False)
         
         # Afficher tous les lecteurs
         self.file_system_model.setRootPath('')
@@ -330,8 +333,63 @@ class FileTreeWidget(QWidget):
         self.setup_connections()
         
         # Si un chemin racine a été fourni, l'utiliser
+
+        # Option : positionner une racine spécifique si besoin
         if root_path and os.path.exists(root_path):
             self.set_root_path(root_path)
+        else:
+            # Appel du refresh traditionnel pour afficher l'état réel du disque dès le début
+            self.refresh_tree_view()
+    
+
+    def refresh_tree_view(self, keep_selection=True):
+        """
+        Rafraîchit complètement l'affichage de l'arborescence de fichiers (QTreeView).
+        À appeler après toute modification du système de fichiers ou à l'initialisation.
+
+        Args:
+            keep_selection (bool): Si True, tente de resélectionner l'élément sélectionné avant le refresh.
+        """
+        # 1. Sauvegarder l'élément sélectionné (pour UX)
+        selected_path = self.get_selected_path() if keep_selection else None
+
+        # 2. Rafraîchir le modèle système de fichiers
+        try:
+            self.file_system_model.refresh()  # PySide6 >= 6.2
+        except AttributeError:
+            # Pour compatibilité, reset racine puis reviens si besoin
+            self.file_system_model.setRootPath('')
+            if self.root_path:
+                self.file_system_model.setRootPath(self.root_path)
+
+        # 3. Forcer le recalcul du proxy
+        self.proxy_model.invalidateFilter()
+        self.proxy_model.invalidate()
+
+        # 4. Redéfinir la racine de la vue
+        if self.root_path:
+            root_index = self.file_system_model.index(self.root_path)
+            proxy_root_index = self.proxy_model.mapFromSource(root_index)
+            self.tree_view.setRootIndex(proxy_root_index)
+            self.tree_view.expand(proxy_root_index)
+        else:
+            root_index = self.file_system_model.index('')
+            proxy_root_index = self.proxy_model.mapFromSource(root_index)
+            self.tree_view.setRootIndex(proxy_root_index)
+            self.tree_view.expand(proxy_root_index)
+
+        # 5. Récupérer la sélection si possible
+        if selected_path and os.path.exists(selected_path):
+            index = self.file_system_model.index(selected_path)
+            proxy_index = self.proxy_model.mapFromSource(index)
+            if proxy_index.isValid():
+                self.tree_view.setCurrentIndex(proxy_index)
+                self.tree_view.scrollTo(proxy_index)
+
+        # 6. Rafraîchir visuellement la vue
+        self.tree_view.viewport().update()
+        self.tree_view.repaint()
+
     
     def init_ui(self):
         """Initialise l'interface utilisateur du widget"""
@@ -565,6 +623,9 @@ class FileTreeWidget(QWidget):
                 # Rafraîchir la vue et sélectionner le nouveau répertoire
                 self.update_tree_view_and_select_folder(new_folder_path)
                 
+                # Émettre le signal pour indiquer qu'une création de dossier a été effectuée
+                self.file_operation.emit("create", new_folder_path, True, True)  # True pour is_dir car c'est un dossier
+                
                 print(f"Répertoire créé : {new_folder_path}")
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Impossible de créer le répertoire: {str(e)}")
@@ -583,16 +644,22 @@ class FileTreeWidget(QWidget):
         item_name = os.path.basename(path)
         item_type = "répertoire" if is_dir else "fichier"
         
-        # Demander confirmation avant suppression
-        confirmation = QMessageBox.question(
-            self,
-            "Confirmation de suppression",
-            f"Êtes-vous sûr de vouloir supprimer {item_type} '{item_name}'?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
+        # Créer une boîte de dialogue de confirmation personnalisée avec boutons en français
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setWindowTitle("Confirmation de suppression")
+        msg_box.setText(f"Êtes-vous sûr de vouloir supprimer {item_type} '{item_name}'?")
         
-        if confirmation == QMessageBox.Yes:
+        # Créer les boutons Oui et Non en français
+        oui_button = msg_box.addButton("Oui", QMessageBox.YesRole)
+        non_button = msg_box.addButton("Non", QMessageBox.NoRole)
+        msg_box.setDefaultButton(non_button)
+        
+        # Afficher la boîte de dialogue et attendre la réponse
+        msg_box.exec_()
+        
+        # Vérifier quel bouton a été cliqué
+        if msg_box.clickedButton() == oui_button:
             try:
                 # Sauvegarder le répertoire parent
                 parent_path = os.path.dirname(path)
@@ -605,14 +672,16 @@ class FileTreeWidget(QWidget):
                 else:
                     os.remove(path)
                 
-                # Sélectionner le répertoire parent s'il existe encore
-                # sinon ne pas changer la vue (garder l'affichage des lecteurs)
-                if parent_exists and os.path.exists(parent_path):
-                    self.tree_view.setCurrentIndex(self.proxy_model.mapFromSource(
-                        self.file_system_model.index(parent_path)
-                    ))
-                    # Faire défiler pour que l'élément soit visible
-                    self.tree_view.scrollTo(self.tree_view.currentIndex())
+                # Après suppression, réinitialiser complètement l'arborescence
+                
+                # Réinitialiser la variable root_path pour revenir à l'état initial
+                self.root_path = None
+                
+                # Utiliser la méthode refresh_tree_view pour actualiser l'arborescence
+                self.refresh_tree_view(keep_selection=False)
+                
+                # Émettre le signal pour indiquer qu'une suppression a été effectuée
+                self.file_operation.emit("delete", path, True, is_dir)
                 
                 print(f"{item_type.capitalize()} supprimé : {path}")
             except Exception as e:

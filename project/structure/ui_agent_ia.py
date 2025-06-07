@@ -84,8 +84,13 @@ from action_types import (
 )
 from project_creator import ProjectCreator
 from project_creator_show import ProjectCreatorShow
+
 # Import du FileTreeWidget depuis le module local
-from project.structure.file_tree_widget import FileTreeWidget, FORBIDDEN_PATHS, SYSTEM_DRIVES
+from project.structure.file_tree_widget import (
+    FileTreeWidget,
+    FORBIDDEN_PATHS,
+    SYSTEM_DRIVES,
+)
 from project_types_widget import ProjectTypesWidget
 from project_type_card import ProjectTypeCard
 from top_bar_widget import TopBarWidget
@@ -227,8 +232,9 @@ class ChatArboWidget(QWidget):
 
         # Connecter les signaux aux slots
         self.file_tree.item_clicked.connect(self.on_tree_item_clicked)
-        self.file_tree.item_double_clicked.connect(self.on_tree_item_double_clicked)
-        self.file_tree.search_text_changed.connect(self.on_tree_search_changed)
+        self.file_tree.file_operation.connect(self.on_file_operation)
+        # self.file_tree.item_double_clicked.connect(self.on_tree_item_double_clicked)
+        # self.file_tree.search_text_changed.connect(self.on_tree_search_changed)
 
         # Widget d'arborescence prêt à être utilisé
         tree_widget = self.file_tree
@@ -443,12 +449,61 @@ class ChatArboWidget(QWidget):
         """
         )
 
+    def on_file_operation(self, action, path, success, is_dir):
+        """Gère les signaux d'opérations sur les fichiers/dossiers
+        
+        Args:
+            action (str): Type d'action effectuée ("create", "delete", etc.)
+            path (str): Chemin du fichier/dossier concerné
+            success (bool): Indique si l'opération a réussi
+            is_dir (bool): Indique si l'élément est un dossier (True) ou un fichier (False)
+        """
+        # Définir les messages et icônes en fonction de l'action et du résultat
+        icon_color = "#4CAF50" if success else "#F44336"  # Vert si succès, rouge si échec
+        
+        # Obtenir le nom du fichier/dossier sans le chemin complet
+        item_name = os.path.basename(path)
+        
+        # Déterminer le type d'élément (fichier ou dossier) à partir du paramètre is_dir
+        item_type = "dossier" if is_dir else "fichier"
+        
+        # Créer un message différent selon l'action
+        if action == "delete":
+            if success:
+                message = f"Le {item_type} <b>{item_name}</b> a été supprimé avec succès."
+            else:
+                message = f"Échec de la suppression du {item_type} <b>{item_name}</b>."
+        elif action == "create":
+            if success:
+                message = f"Le {item_type} <b>{item_name}</b> a été créé avec succès."
+            else:
+                message = f"Échec de la création du {item_type} <b>{item_name}</b>."
+        else:
+            # Pour d'autres types d'actions
+            if success:
+                message = f"Opération '{action}' réussie sur {item_type} <b>{item_name}</b>."
+            else:
+                message = f"Échec de l'opération '{action}' sur {item_type} <b>{item_name}</b>."
+        
+        # Afficher une bulle de notification
+        self.clear_bubbles()
+
+        self.add_chat_bubble(
+            message,
+            is_user=False,
+            icon_color="#FFFFFF",
+            word_wrap=False,
+            icon_name="info",
+            icon_size=24
+        )
+    
     def on_tree_item_clicked(self, path, is_dir):
         """Gère le clic sur un élément de l'arborescence"""
-        self.clear_bubbles()        
+        # self.clear_bubbles()
 
         # Afficher le chemin sélectionné dans la barre d'état
         print(f"Chemin sélectionné: {os.path.basename(path)}")
+        
         # Utiliser la nouvelle méthode pour afficher le chemin sélectionné
         if not is_dir:
             # Si c'est un fichier, afficher le chemin du répertoire parent
@@ -458,9 +513,9 @@ class ChatArboWidget(QWidget):
             # Si c'est un répertoire, afficher le chemin complet
             self.top_bar.update_selected_path(path, is_dir)
             self.path_root = path        
-
-        self.selected_project_path = self.path_root
         
+        self.selected_project_path = self.path_root
+
         # Si on attend la sélection d'un dossier pour la création de projet
         if hasattr(self, "wait_for_path") and self.wait_for_path:
             # Mettre en évidence l'arborescence avec un timer pour éviter l'exécution immédiate
@@ -485,217 +540,6 @@ class ChatArboWidget(QWidget):
             # Pour les autres cas de clic sur le TreeView, on ne fait rien de spécial
             pass
 
-    def on_tree_item_double_clicked(self, path, is_dir):
-        """Gère le double-clic sur un élément de l'arborescence"""
-        if not is_dir:
-            # Afficher le contenu du fichier
-            self.display_file_content(path)
-
-    def display_file_content(self, file_path):
-        """Affiche le contenu d'un fichier dans une bulle de chat"""
-        try:
-            # Vérifier si le fichier existe
-            if not os.path.isfile(file_path):
-                self.add_chat_bubble(
-                    f"Le fichier n'existe pas: {file_path}", is_user=False
-                )
-                return
-
-            # Déterminer le type de fichier
-            _, ext = os.path.splitext(file_path)
-
-            # Extensions de fichiers texte courants
-            text_extensions = [
-                ".txt",
-                ".py",
-                ".js",
-                ".html",
-                ".css",
-                ".json",
-                ".xml",
-                ".md",
-                ".log",
-                ".csv",
-                ".h",
-                ".c",
-                ".cpp",
-            ]
-
-            # Taille maximale pour l'affichage (pour éviter de charger des fichiers volumineux)
-            max_size = 500 * 1024  # 500 Ko
-
-            if os.path.getsize(file_path) > max_size:
-                self.add_chat_bubble(
-                    f"<b>Fichier trop volumineux</b><br>Le fichier '{os.path.basename(file_path)}' est trop grand pour être affiché (> 500 Ko).",
-                    is_user=False,
-                )
-                return
-
-            if ext.lower() in text_extensions:
-                # Lire le contenu du fichier texte
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read()
-
-                # Ajouter une bulle avec le contenu du fichier
-                file_name = os.path.basename(file_path)
-                self.add_chat_bubble(
-                    f"<b>Fichier: {file_name}</b><br><pre style='background-color: #f5f5f5; padding: 10px; border-radius: 5px;'>{content}</pre>",
-                    is_user=False,
-                    word_wrap=True,
-                )
-            else:
-                # Pour les fichiers non texte, afficher un message
-                self.add_chat_bubble(
-                    f"<b>Fichier non texte</b><br>Le fichier '{os.path.basename(file_path)}' ({ext}) n'est pas un fichier texte et ne peut pas être affiché.",
-                    is_user=False,
-                )
-        except Exception as e:
-            self.add_chat_bubble(
-                f"<b>Erreur lors de la lecture du fichier</b><br>{str(e)}",
-                is_user=False,
-            )
-
-    def update_preview(self, selected, deselected):
-        """Met à jour l'aperçu du fichier sélectionné dans l'arborescence"""
-        # Récupérer les indices sélectionnés
-        indices = selected.indexes()
-
-        if not indices:
-            # Aucune sélection, effacer l'aperçu
-            self.preview.clear()
-            return
-
-        # Prendre le premier indice sélectionné (colonne 0 = nom)
-        index = indices[0]
-
-        # Récupérer le chemin du fichier sélectionné
-        path = self.file_tree.model.filePath(index)
-
-        # Vérifier si c'est un fichier
-        if os.path.isfile(path):
-            try:
-                # Déterminer le type de fichier
-                _, ext = os.path.splitext(path)
-
-                # Taille maximale pour l'aperçu (pour éviter de charger des fichiers volumineux)
-                max_size = 100 * 1024  # 100 Ko
-
-                if os.path.getsize(path) > max_size:
-                    self.preview.setPlainText(
-                        f"Le fichier est trop volumineux pour un aperçu (> 100 Ko).\nChemin: {path}"
-                    )
-                    return
-
-                # Extensions de fichiers texte courants
-                text_extensions = [
-                    ".txt",
-                    ".py",
-                    ".js",
-                    ".html",
-                    ".css",
-                    ".json",
-                    ".xml",
-                    ".md",
-                    ".log",
-                    ".csv",
-                    ".h",
-                    ".c",
-                    ".cpp",
-                ]
-
-                if ext.lower() in text_extensions:
-                    # Lire le contenu du fichier texte
-                    with open(path, "r", encoding="utf-8", errors="replace") as f:
-                        content = f.read()
-
-                    # Afficher le contenu dans l'aperçu
-                    self.preview.setPlainText(content)
-                else:
-                    # Pour les fichiers non texte, afficher un message
-                    self.preview.setPlainText(
-                        f"Aperçu non disponible pour ce type de fichier ({ext}).\nChemin: {path}"
-                    )
-            except Exception as e:
-                self.preview.setPlainText(
-                    f"Erreur lors de la lecture du fichier: {str(e)}\nChemin: {path}"
-                )
-        else:
-            # Pour les dossiers, afficher des informations sur le dossier
-            try:
-                # Compter les fichiers et sous-dossiers
-                files = []
-                dirs = []
-
-                try:
-                    with os.scandir(path) as entries:
-                        for entry in entries:
-                            if entry.is_file():
-                                files.append(entry.name)
-                            elif entry.is_dir():
-                                dirs.append(entry.name)
-                except PermissionError:
-                    self.preview.setPlainText(
-                        f"Accès refusé au dossier.\nChemin: {path}"
-                    )
-                    return
-
-                # Préparer le message à afficher
-                message = f"Dossier: {path}\n\n"
-                message += f"Contient {len(files)} fichier(s) et {len(dirs)} sous-dossier(s)\n\n"
-
-                if dirs:
-                    message += "Sous-dossiers:\n"
-                    for d in sorted(dirs)[:10]:  # Limiter à 10 dossiers
-                        message += f"- {d}\n"
-                    if len(dirs) > 10:
-                        message += f"... et {len(dirs) - 10} autres\n"
-                    message += "\n"
-
-                if files:
-                    message += "Fichiers:\n"
-                    for f in sorted(files)[:10]:  # Limiter à 10 fichiers
-                        message += f"- {f}\n"
-                    if len(files) > 10:
-                        message += f"... et {len(files) - 10} autres\n"
-
-                self.preview.setPlainText(message)
-            except Exception as e:
-                self.preview.setPlainText(
-                    f"Erreur lors de la lecture du dossier: {str(e)}\nChemin: {path}"
-                )
-
-        # Si on attend la sélection d'un dossier pour la création de projet
-        if self.wait_for_path:
-            # Afficher le nom du chemin en entier dans un bubblechat
-            self.add_chat_bubble(
-                f"<b>Chemin sélectionné :</b> {path}{self.project_name}",
-                is_user=True,
-                word_wrap=False,
-            )
-
-            # Stocker le chemin pour une utilisation ultérieure
-            self.wait_for_path = False
-
-        self.wait_for_path = False
-
-    # La seconde méthode reset_status_message a également été supprimée
-    # car elle faisait double emploi avec top_bar.update_connection_status
-
-    def clear_project_type_bubbles(self):
-        """Efface les bulles de types de projets précédentes pour éviter les doublons"""
-        # Parcourir tous les widgets dans le chat_layout et supprimer ceux qui contiennent des types de projets
-        if hasattr(self, "chat_layout"):
-            for i in range(self.chat_layout.count()):
-                widget = self.chat_layout.itemAt(i).widget()
-                if (
-                    widget
-                    and hasattr(widget, "project_type_bubble")
-                    and widget.project_type_bubble
-                ):
-                    widget.setVisible(False)
-                    widget.deleteLater()
-
-    
     def display_project_types(self):
         """Affiche les types de projets disponibles en grille de 4 colonnes avec ProjectTypeCard"""
 
@@ -710,7 +554,7 @@ class ChatArboWidget(QWidget):
             )
 
         # Effacer les bulles précédentes
-        self.clear_project_type_bubbles()
+        self.clear_bubbles()
 
         # Obtenir les données des types de projets
         project_types = self.project_show.get_project_types_data()
@@ -827,7 +671,6 @@ class ChatArboWidget(QWidget):
         # Effacer les messages précédents pour éviter les doublons
         self.clear_bubbles()
 
-
         # Afficher les technologies disponibles pour ce type de projet
         self.display_technologies_for_project_type(project_type_id)
 
@@ -835,9 +678,10 @@ class ChatArboWidget(QWidget):
         """Affiche les technologies disponibles pour un type de projet en utilisant ProjectTypeCard"""
         # Effacer les bulles de technologies précédentes
         self.clear_bubbles()
-        
+
         # Ajouter un bouton de retour pour revenir à la sélection des types de projets
         from project.structure.back_button import BackButton
+
         back_button = BackButton("« Retour aux types de projets")
         back_button.clicked.connect(self.handle_back_to_project_types)
 
@@ -856,7 +700,7 @@ class ChatArboWidget(QWidget):
         technologies = tech_data["technologies"]
         project_type_name = tech_data["project_type_name"]
         project_color = tech_data["project_color"]
-        
+
         # Créer un message pour introduire les technologies
         intro_bubble = self.add_chat_bubble(
             f"Sélectionnez une technologie pour {project_type_name} :",
@@ -954,9 +798,7 @@ class ChatArboWidget(QWidget):
         # Appliquer un effet visuel aux cartes pour montrer celle qui est sélectionnée
         # et désactiver les autres
         for widget in self.findChildren(QWidget):
-            if widget.property("tech_bubble") and isinstance(
-                widget, ProjectTypeCard
-            ):
+            if widget.property("tech_bubble") and isinstance(widget, ProjectTypeCard):
                 if widget.property("tech_id") == tech_id:
                     # Mettre en évidence la carte sélectionnée
                     widget.set_selected(True)
@@ -996,7 +838,7 @@ class ChatArboWidget(QWidget):
                 for pt in self.project_show.get_project_types()
                 if pt["id"] == project_type_id
             ),
-            "Type de projet inconnu", # Valeur par défaut si non trouvé
+            "Type de projet inconnu",  # Valeur par défaut si non trouvé
         )
         technology_name = next(
             (
@@ -1070,30 +912,30 @@ class ChatArboWidget(QWidget):
         self.connection_thread = QThread()
         self.connection_worker = ConnectionWorker("http://localhost:8000/health")
         self.connection_worker.moveToThread(self.connection_thread)
-        
+
         # Connecter les signaux
         self.connection_thread.started.connect(self.connection_worker.check_connection)
         self.connection_worker.connection_result.connect(self.handle_connection_result)
         self.connection_worker.finished.connect(self.connection_thread.quit)
         self.connection_worker.finished.connect(self.connection_worker.deleteLater)
         self.connection_thread.finished.connect(self.connection_thread.deleteLater)
-        
+
         # Démarrer le thread
         self.connection_thread.start()
-    
+
     def handle_connection_result(self, is_connected, message):
         """Gère le résultat de la vérification de connexion"""
         self.server_connected = is_connected
         try:
-            if hasattr(self, 'top_bar') and self.top_bar:
+            if hasattr(self, "top_bar") and self.top_bar:
                 self.top_bar.update_connection_status(is_connected, message)
         except RuntimeError:
             # L'objet a déjà été supprimé, ignorer silencieusement
-            print("Impossible de mettre à jour le statut de connexion : top_bar a été supprimé")
+            print(
+                "Impossible de mettre à jour le statut de connexion : top_bar a été supprimé"
+            )
         except Exception as e:
             print(f"Erreur lors de la mise à jour du statut de connexion : {e}")
-
-
 
     @Slot()
     def send_message(
@@ -1227,7 +1069,9 @@ class ChatArboWidget(QWidget):
 
                 # Créer directement le projet si le message est "Créer le projet avec le chemin sélectionné"
                 if "avec le chemin sélectionné" in text_lower:
-                    self.create_app_skeleton()
+                    self.create_app_skeleton(
+                        self.selected_project_type, self.selected_technology
+                    )
                     return
 
             # Pour les autres actions, on pourrait ajouter d'autres cas spécifiques ici
@@ -1481,7 +1325,7 @@ class ChatArboWidget(QWidget):
         """Gère la sélection d'une rubrique"""
         # Ajouter le choix de l'utilisateur comme message
         self.clear_bubbles()
-        
+
         self.add_chat_bubble(
             f"Je souhaite de l'aide sur : {topic}",
             is_user=True,
@@ -1707,10 +1551,10 @@ class ChatArboWidget(QWidget):
         """Affiche les langages de programmation disponibles pour une technologie en utilisant ProjectTypeCard"""
         # Nettoyer les anciennes bulles de langages
         self.clear_bubbles()
-        
 
         # Ajouter un bouton de retour pour revenir à la sélection des technologies
         from project.structure.back_button import BackButton
+
         back_button = BackButton("« Retour aux technologies")
         back_button.clicked.connect(lambda: self.handle_back_to_technologies())
 
@@ -1829,12 +1673,6 @@ class ChatArboWidget(QWidget):
                     empty_widget, last_row, (total_items % num_columns) + i
                 )
 
-    def clear_language_bubbles(self):
-        """Supprime toutes les bulles de langages"""
-        for widget in self.findChildren(QWidget):
-            if widget.property("language_bubble"):
-                widget.deleteLater()
-
     def on_language_selected(self, lang_id, technology_id):
         """Gère la sélection d'un langage de programmation"""
         # Appliquer un effet visuel aux cartes pour montrer celle qui est sélectionnée
@@ -1891,6 +1729,7 @@ class ChatArboWidget(QWidget):
 
         # Ajouter un bouton de retour pour revenir à la sélection des langages
         from project.structure.back_button import BackButton
+
         back_button = BackButton("« Retour aux langages")
         back_button.clicked.connect(
             lambda: self.handle_back_to_languages(technology_id)
@@ -1985,9 +1824,7 @@ class ChatArboWidget(QWidget):
                 empty_widget.setFixedSize(250, 150)  # Taille approximative d'une carte
                 empty_widget.setStyleSheet("background-color: transparent;")
                 empty_widget.setProperty("project_subtype_bubble", True)
-                grid_layout.addWidget(
-                    empty_widget, row, col + i
-                )
+                grid_layout.addWidget(empty_widget, row, col + i)
 
         # Ajouter le conteneur au layout principal
         self.chat_layout.addWidget(project_subtype_container)
@@ -2082,7 +1919,7 @@ class ChatArboWidget(QWidget):
             + f"<b>Technologie :</b> {technology_name}<br>"
             + f"<b>Langage :</b> {language_name}<br>"
             + f"<b>Type spécifique :</b> {subtype_name}",
-            is_user=False   ,
+            is_user=False,
             word_wrap=True,
             icon_name="info",
             icon_color="#FFFFFF",
@@ -2099,6 +1936,8 @@ class ChatArboWidget(QWidget):
             is_user=False,
             word_wrap=True,
         )
+        # genere le projet
+        self.create_app_skeleton(self.selected_project_type, self.selected_technology)
 
     def on_app_type_selected(self, app_type):
         """Gère la sélection d'un type d'application via le signal"""
@@ -2117,7 +1956,6 @@ class ChatArboWidget(QWidget):
         # On peut l'utiliser pour des actions supplémentaires si nécessaire
         pass
 
-    
     def update_tree_view_and_select_folder(self, folder_path):
         """Met à jour la vue d'arborescence et sélectionne un dossier"""
         if not os.path.exists(folder_path):
@@ -2128,6 +1966,7 @@ class ChatArboWidget(QWidget):
         self.file_tree.update_tree_view_and_select_folder(folder_path)
 
         QTimer.singleShot(100, self.file_tree.highlight_tree_view)
+
     def add_project_name_input(self):
         """Ajoute une bulle interactive pour saisir le nom du projet"""
         # Créer un conteneur pour la bulle
@@ -2334,7 +2173,7 @@ class ChatArboWidget(QWidget):
 
         # Afficher le chemin complet et demander confirmation avec boutons intégrés
         chemin_complet = os.path.join(self.path_root, self.project_name)
-        message_text = f"<b>Chemin complet du projet :</b><br><code>{chemin_complet}</code><br><br>Ce chemin vous convient-il ?"
+        message_text = f"<b>Chemin complet du projet :</b><code>{chemin_complet}</code><br><br>Ce chemin vous convient-il ?"
 
         # Créer la bulle avec les boutons intégrés et une icône de dossier
         self.path_confirmation = PathConfirmationButtons(message_text, self)
@@ -2352,49 +2191,57 @@ class ChatArboWidget(QWidget):
 
     def is_path_allowed(self, path):
         """Vérifie si un chemin est autorisé pour la création de répertoires
-        
+
         Args:
             path (str): Le chemin à vérifier
-            
+
         Returns:
             tuple: (bool, str) - Un booléen indiquant si le chemin est autorisé et un message explicatif
         """
         if not path:
             return (False, "Le chemin ne peut pas être vide")
-        
+
         # Les constantes FORBIDDEN_PATHS et SYSTEM_DRIVES sont maintenant importées en haut du fichier
-            
+
         # Normaliser le chemin pour faciliter la comparaison
         normalized_path = os.path.normpath(path).lower()
-        
+
         # Extraire la lettre du lecteur si présente
         drive_letter = None
-        if len(normalized_path) > 1 and normalized_path[1] == ':':
+        if len(normalized_path) > 1 and normalized_path[1] == ":":
             drive_letter = normalized_path[0]
-            
+
         # Vérifier si le chemin contient un des emplacements interdits
         path_parts = normalized_path.split(os.sep)
-        
+
         # Si le chemin est sur un lecteur système, vérifier les emplacements interdits
         if drive_letter in SYSTEM_DRIVES:
             for forbidden in FORBIDDEN_PATHS:
                 forbidden_lower = forbidden.lower()
-                
+
                 # Vérifier si un des composants du chemin est interdit
                 for part in path_parts:
-                    if part == forbidden_lower or \
-                       part.startswith("programfiles") or \
-                       part.startswith("program files"):
-                        return (False, f"Création de dossier interdite dans l'emplacement système '{forbidden}'")
-        
+                    if (
+                        part == forbidden_lower
+                        or part.startswith("programfiles")
+                        or part.startswith("program files")
+                    ):
+                        return (
+                            False,
+                            f"Création de dossier interdite dans l'emplacement système '{forbidden}'",
+                        )
+
         # Vérifier si le chemin existe et est accessible en écriture
         parent_path = os.path.dirname(path)
         if os.path.exists(parent_path):
             if not os.access(parent_path, os.W_OK):
-                return (False, f"Le dossier parent '{parent_path}' n'est pas accessible en écriture")
-        
+                return (
+                    False,
+                    f"Le dossier parent '{parent_path}' n'est pas accessible en écriture",
+                )
+
         return (True, "Chemin autorisé")
-        
+
     def on_path_confirmed(self):
         """Gère la confirmation du chemin du projet et crée directement le répertoire"""
         self.add_chat_bubble(
@@ -2404,7 +2251,7 @@ class ChatArboWidget(QWidget):
             icon_color="#FFFFFF",
             word_wrap=False,
         )
-        
+
         # Vérifier si le chemin est autorisé avant de créer le répertoire
         project_path = os.path.join(self.path_root, self.project_name)
         is_allowed, message = self.is_path_allowed(project_path)
@@ -2423,7 +2270,7 @@ class ChatArboWidget(QWidget):
             return
 
         # Créer directement le répertoire du projet sans demander de confirmation supplémentaire
-        self.create_app_skeleton()
+        self.create_app_skeleton(self.selected_project_type, self.selected_technology)
 
     def on_path_rejected(self):
         """Gère le rejet du chemin du projet et permet de saisir un nouveau nom de dossier"""
@@ -2561,7 +2408,7 @@ class ChatArboWidget(QWidget):
 
         # Stocker le nouveau nom de dossier
         self.project_folder_name = folder_name
-        
+
         # Vérifier si le chemin est autorisé
         project_path = os.path.join(self.path_root, folder_name)
         is_allowed, message = self.is_path_allowed(project_path)
@@ -2604,8 +2451,13 @@ class ChatArboWidget(QWidget):
             is_user=False,
         )
 
-        # Simuler un délai pour la génération
-        QTimer.singleShot(1500, self.create_app_skeleton)
+        # Simuler un délai pour la génération en passant les paramètres nécessaires
+        QTimer.singleShot(
+            1500,
+            lambda: self.create_app_skeleton(
+                self.selected_project_type, self.selected_technology
+            ),
+        )
 
     def on_create_app_rejected(self):
         """Gère le rejet de la création du dossier du projet"""
@@ -2634,7 +2486,7 @@ class ChatArboWidget(QWidget):
 
         # Chemin complet du projet
         project_path = os.path.join(self.path_root, folder_name)
-        
+
         # Vérifier si le chemin est autorisé
         is_allowed, message = self.is_path_allowed(project_path)
         if not is_allowed:
@@ -2666,48 +2518,36 @@ class ChatArboWidget(QWidget):
                     project_path, project_type_id, technology_id
                 )
 
-                # Trouver les noms du type de projet et de la technologie
-                project_type_name = next(
-                    (
-                        pt["name"]
-                        for pt in self.get_project_types()
-                        if pt["id"] == project_type_id
-                    ),
-                    "",
+                # Obtenir les noms du type de projet et de la technologie directement via ProjectCreator
+                project_type_name = ProjectCreator._get_project_type_name(
+                    project_type_id
                 )
-                technology_name = next(
-                    (
-                        tech["name"]
-                        for tech in self.get_technologies_for_project_type(
-                            project_type_id
-                        )
-                        if tech["id"] == technology_id
-                    ),
-                    "",
+                technology_name = ProjectCreator._get_technology_name(
+                    project_type_id, technology_id
                 )
 
                 # Message spécifique avec les détails du projet
                 self.add_chat_bubble(
-                    f"<b>Votre projet '{self.project_name}' de type <span style='color:#2196F3'>{project_type_name}</span> "
-                    f"utilisant <span style='color:#FF9800'>{technology_name}</span> est prêt !</b><br><br>"
+                    f"<b>Votre projet '{self.project_name}' de type <span style='color:#e3fbfc'>{project_type_name}</span> "
+                    f"utilisant <span style='color:#e3fbfc'>{technology_name}</span> est prêt !</b><br><br>"
                     f"Le dossier du projet a été {creation_status} :<br>"
                     f"<code>{project_path}</code><br><br>"
                     "Vous pouvez maintenant commencer à travailler sur votre application.",
                     is_user=False,
-                    icon_name="circle-check",
-                    icon_color="#4CAF50",
+                    icon_name="info",
+                    icon_color="#FFFFFF",
                     icon_size=24,
                 )
             else:
                 # Message générique si nous n'avons pas d'informations sur le type de projet
                 self.add_chat_bubble(
-                    f"<b>Votre squelette d'application '{self.project_name}' est prêt !</b><br><br>"
+                    f"<b>Votre squelette d'application '<span style='color:#2196F3'>{self.project_name}</span>' est prêt !</b><br><br>"
                     f"Le dossier du projet a été {creation_status} :<br>"
                     f"<code>{project_path}</code><br><br>"
                     "Vous pouvez maintenant commencer à travailler sur votre application.",
                     is_user=False,
-                    icon_name="circle-check",
-                    icon_color="#4CAF50",
+                    icon_name="info",
+                    icon_color="#FFFFFF",
                     icon_size=24,
                 )
 
@@ -2758,7 +2598,7 @@ class ChatArboWidget(QWidget):
         # Afficher le chemin complet et demander confirmation
         chemin_complet = os.path.join(self.path_root, self.project_name)
         self.add_chat_bubble(
-            f"<b>Chemin complet du projet :</b><br>"
+            f"<b>Chemin complet du projet :</b>"
             f"<code>{chemin_complet}</code><br><br>"
             "Ce chemin vous convient-il ?",
             is_user=False,
@@ -2869,16 +2709,6 @@ class ChatArboWidget(QWidget):
                 return []
         return []
 
-    def get_drive_info(self, drive_letter):
-        # Obtenir des informations sur le lecteur (espace libre, capacité totale, etc.)
-        try:
-            total, used, free = shutil.disk_usage(drive_letter)
-            total_gb = total / (1024**3)
-            free_gb = free / (1024**3)
-            return f"Espace total: {total_gb:.2f} GB, Espace libre: {free_gb:.2f} GB"
-        except Exception as e:
-            return f"Impossible d'obtenir les informations du lecteur: {str(e)}"
-
     def apply_actions(self, actions):
         for action in actions:
             typ = action.get("type")
@@ -2897,126 +2727,6 @@ class ChatArboWidget(QWidget):
                     os.remove(path)
                 self.add_chat_bubble(f"🗑️ Supprimé: {path}", is_user=True)
         self.model.refresh()
-
-    @Slot()
-    def on_tree_search_changed(self, text):
-        """Gère le changement de texte dans le champ de recherche de l'arborescence"""
-        # Cette méthode est connectée au signal search_text_changed du FileTreeWidget
-        # Le filtrage est déjà géré dans le composant FileTreeWidget, donc nous n'avons pas besoin
-        # d'implémenter la logique de filtrage ici.
-        pass
-
-    @Slot()
-    def filter_files(self, text):
-        """Méthode de compatibilité pour filtrer les fichiers (utilise file_tree.filter_tree_view).
-           La logique de repli ci-dessous est conservée mais devrait utiliser le paramètre 'text'."""
-        self.file_tree.filter_tree_view(text)
-        # Vérifier si la recherche est vide
-        if not text:
-            # Si la recherche est vide, afficher tous les fichiers
-            self.tree.setModel(self.model)
-            return
-
-        # Fonction récursive pour parcourir l'arborescence et afficher/masquer les éléments
-        def filter_tree_items(parent_index):
-            show_parent = False
-            row_count = self.model.rowCount(parent_index)
-
-            for row in range(row_count):
-                child_index = self.model.index(row, 0, parent_index)
-                file_name = self.model.fileName(child_index).lower()
-                file_path = self.model.filePath(child_index).lower()
-
-                # Vérifier si le nom ou le chemin contient le texte de recherche
-                if text.lower() in file_name or text.lower() in file_path: # Utiliser text.lower() ici
-                    self.tree.setRowHidden(row, parent_index, False)
-                    show_parent = True
-                else:
-                    # Vérifier récursivement les enfants
-                    has_visible_children = filter_tree_items(child_index)
-                    self.tree.setRowHidden(row, parent_index, not has_visible_children)
-                    show_parent = show_parent or has_visible_children
-
-            return show_parent
-
-        # Commencer le filtrage à partir de la racine
-        filter_tree_items(QModelIndex())
-
-    @Slot()
-    def preview_selected_file(self):
-        """Met à jour l'aperçu avec le fichier actuellement sélectionné dans l'arborescence"""
-        # Récupérer l'indice sélectionné
-        idx = self.file_tree.tree_view.currentIndex()
-        if not idx.isValid():
-            self.preview.clear()
-            return
-
-        # Récupérer le chemin
-        path = self.file_tree.file_model.filePath(idx)
-
-        # Traiter les fichiers
-        if os.path.isfile(path):
-            try:
-                # Déterminer le type de fichier
-                _, ext = os.path.splitext(path)
-
-                # Extensions de fichiers texte courants
-                text_extensions = [
-                    ".txt",
-                    ".py",
-                    ".js",
-                    ".html",
-                    ".css",
-                    ".json",
-                    ".xml",
-                    ".md",
-                    ".log",
-                    ".csv",
-                    ".h",
-                    ".c",
-                    ".cpp",
-                ]
-
-                # Taille maximale pour l'aperçu
-                max_size = 100 * 1024  # 100 Ko
-
-                if os.path.getsize(path) > max_size:
-                    self.preview.setPlainText(
-                        f"Le fichier est trop volumineux pour un aperçu (> 100 Ko).\nChemin: {path}"
-                    )
-                    return
-
-                if ext.lower() in text_extensions:
-                    with open(path, "r", encoding="utf-8", errors="replace") as f:
-                        content = f.read(2000)  # Limiter à 2000 caractères
-                    self.preview.setPlainText(content)
-                else:
-                    self.preview.setPlainText(
-                        f"Aperçu non disponible pour ce type de fichier ({ext}).\nChemin: {path}"
-                    )
-            except Exception as e:
-                self.preview.setPlainText(
-                    f"Erreur lors de la lecture du fichier: {str(e)}"
-                )
-        else:
-            # Pour les dossiers, afficher des informations sur le dossier
-            try:
-                info = f"Dossier: {path}\n\n"
-                items = os.listdir(path)
-                files = [f for f in items if os.path.isfile(os.path.join(path, f))]
-                dirs = [d for d in items if os.path.isdir(os.path.join(path, d))]
-
-                info += (
-                    f"Contient {len(files)} fichier(s) et {len(dirs)} sous-dossier(s)\n"
-                )
-                self.preview.setPlainText(info)
-            except Exception as e:
-                self.preview.setPlainText(
-                    f"Erreur lors de la lecture du dossier: {str(e)}"
-                )
-
-    # Alias pour maintenir la compatibilité avec le code existant
-    update_preview = preview_selected_file
 
     def export_conversation(self):
         """Exporter la conversation actuelle dans un fichier"""

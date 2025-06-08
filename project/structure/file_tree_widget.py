@@ -93,28 +93,17 @@ class ForbiddenPathProxyModel(QSortFilterProxyModel):
             self.endResetModel()
     
     def filterAcceptsRow(self, source_row, source_parent):
-        """Détermine si une ligne doit être affichée dans le modèle
-        
-        Args:
-            source_row: Index de la ligne dans le modèle source
-            source_parent: Index du parent dans le modèle source
-            
-        Returns:
-            bool: True si la ligne doit être affichée, False sinon
-        """
-        # Si on montre les répertoires interdits, on accepte toutes les lignes
+    # TOUJOURS afficher la racine : les lecteurs (C:, D:, etc.)
+        if not source_parent.isValid():
+            return True
+        # (le reste comme avant)
         if self.show_forbidden:
             return True
-            
-        # Récupérer l'index dans le modèle source
         source_model = self.sourceModel()
         index = source_model.index(source_row, 0, source_parent)
-        
-        # Récupérer le chemin de l'item
         path = source_model.filePath(index)
-        
-        # Vérifier si c'est un répertoire interdit
         return not self.is_forbidden_path(path)
+
     
     def data(self, index, role):
         """Surcharge de la méthode data pour colorier les dossiers interdits en rouge
@@ -373,11 +362,10 @@ class FileTreeWidget(QWidget):
             self.tree_view.setRootIndex(proxy_root_index)
             self.tree_view.expand(proxy_root_index)
         else:
-            root_index = self.file_system_model.index('')
-            proxy_root_index = self.proxy_model.mapFromSource(root_index)
-            self.tree_view.setRootIndex(proxy_root_index)
-            self.tree_view.expand(proxy_root_index)
-
+            # Ici, on veut afficher TOUS les lecteurs racines
+            self.tree_view.setRootIndex(QModelIndex())  # racine du proxy (tous les lecteurs)
+            self.tree_view.expand(QModelIndex())
+            
         # 5. Récupérer la sélection si possible
         if selected_path and os.path.exists(selected_path):
             index = self.file_system_model.index(selected_path)
@@ -398,25 +386,36 @@ class FileTreeWidget(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # Création du layout pour les contrôles en haut
-        top_layout = QHBoxLayout()
-        top_layout.setContentsMargins(5, 5, 5, 5)
-        top_layout.setSpacing(5)
+        # Création du layout pour les contrôles en haut (chemin)
+        path_layout = QHBoxLayout()
+        path_layout.setContentsMargins(5, 5, 5, 0)
+        path_layout.setSpacing(5)
         
         # Ajout du label pour le chemin
         self.path_label = QLabel("Chemin:")
-        top_layout.addWidget(self.path_label)
-        
-        # Ajout de la checkbox pour afficher/masquer les dossiers interdits
-        self.forbidden_checkbox = QCheckBox("Afficher répertoires interdits")
-        self.forbidden_checkbox.setChecked(False)  # Décoché par défaut pour masquer les répertoires interdits
-        top_layout.addWidget(self.forbidden_checkbox)
+        path_layout.addWidget(self.path_label)
         
         # Ajouter un espace extensible
-        top_layout.addStretch()
+        path_layout.addStretch()
         
-        # Ajouter le layout des contrôles au layout principal
-        main_layout.addLayout(top_layout)
+        # Ajouter le layout du chemin au layout principal
+        main_layout.addLayout(path_layout)
+        
+        # Création du layout pour la checkbox (en dessous du chemin)
+        checkbox_layout = QHBoxLayout()
+        checkbox_layout.setContentsMargins(5, 0, 5, 5)
+        checkbox_layout.setSpacing(5)
+        
+        # Ajout de la checkbox pour afficher tout ou seulement le projet en cours
+        self.show_all_checkbox = QCheckBox("Afficher tout")
+        self.show_all_checkbox.setChecked(False)  # Décoché par défaut pour afficher seulement le projet en cours
+        checkbox_layout.addWidget(self.show_all_checkbox)
+        
+        # Ajouter un espace extensible
+        checkbox_layout.addStretch()
+        
+        # Ajouter le layout de la checkbox au layout principal
+        main_layout.addLayout(checkbox_layout)
         
         # Création du TreeView pour l'arborescence de fichiers
         self.tree_view = QTreeView()
@@ -461,8 +460,8 @@ class FileTreeWidget(QWidget):
             self.search_field.textChanged.connect(self.search_text_changed)
         
         # Connexion pour la checkbox des dossiers interdits
-        if hasattr(self, 'forbidden_checkbox') and self.forbidden_checkbox is not None:
-            self.forbidden_checkbox.stateChanged.connect(self.on_show_forbidden_changed)
+        if hasattr(self, 'show_all_checkbox') and self.show_all_checkbox is not None:
+            self.show_all_checkbox.stateChanged.connect(self.on_show_all_changed)
     
     def set_root_path(self, path):
         """Définit le chemin racine pour l'arborescence
@@ -475,17 +474,17 @@ class FileTreeWidget(QWidget):
         
         self.root_path = path
         
-        # Définir le chemin racine dans le modèle de fichiers
+        # Si la case "Afficher tout" est cochée, ne pas changer la racine du TreeView
+        if self.show_all_checkbox.isChecked():
+            # Juste mémoriser le chemin sans changer l'affichage
+            self.path_label.setText(f"Chemin: Tous les lecteurs (Projet: {path})")
+            return
+            
+        # Sinon, on affiche seulement le projet
         root_index = self.file_system_model.setRootPath(path)
-        
-        # Définir l'index racine dans la vue en utilisant le proxy
         proxy_index = self.proxy_model.mapFromSource(root_index)
         self.tree_view.setRootIndex(proxy_index)
-        
-        # Mettre à jour le label du chemin
         self.path_label.setText(f"Chemin: {path}")
-        
-        # Développer le premier niveau
         self.tree_view.expand(proxy_index)
     
     def get_selected_path(self):
@@ -687,27 +686,34 @@ class FileTreeWidget(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Impossible de supprimer {item_type}: {str(e)}")
     
-    def on_show_forbidden_changed(self, state):
-        """Slot appelé quand l'état de la checkbox des dossiers interdits change
+    def on_show_all_changed(self, state):
+        show_all = (state == Qt.Checked.value)
+        self.proxy_model.set_show_forbidden(False)
+        self.delegate.set_show_forbidden(False)
+
         
-        Args:
-            state (int): État de la checkbox (Qt.Checked ou Qt.Unchecked)
-        """
-        show_forbidden = (state == Qt.Checked)
-        
-        # Mettre à jour le modèle proxy
-        self.proxy_model.set_show_forbidden(show_forbidden)
-        
-        # Mettre à jour le délégué
-        self.delegate.set_show_forbidden(show_forbidden)
-        
-        # Forcer le rafraîchissement complet de la vue
-        self.tree_view.viewport().update()
+        if show_all:
+            self.root_path = None
+            self.refresh_tree_view()
+        else:
+            # Mode "Projet" : racine sur le projet courant
+            if self.root_path and os.path.exists(self.root_path):
+                root_index = self.file_system_model.setRootPath(self.root_path)
+                proxy_index = self.proxy_model.mapFromSource(root_index)
+                self.tree_view.setRootIndex(proxy_index)
+                self.path_label.setText(f"Chemin: {self.root_path}")
+            else:
+                # Si pas de projet, afficher tous les lecteurs
+                self.file_system_model.setRootPath(QDir.rootPath())
+                root_index = self.file_system_model.index(QDir.rootPath())
+                proxy_root_index = self.proxy_model.mapFromSource(root_index)
+                self.tree_view.setRootIndex(proxy_root_index)
+                self.path_label.setText("Chemin: Tous les lecteurs")
+        # Toujours forcer la vue à refresh après changement de racine
+        self.proxy_model.invalidateFilter()
+        self.tree_view.expand(self.tree_view.rootIndex())
         self.tree_view.repaint()
-        
-        # Message pour l'utilisateur sur le changement d'affichage
-        status = "affichés en rouge" if show_forbidden else "masqués"
-        print(f"Répertoires système {status}.")
+        self.tree_view.viewport().update()
 
     def highlight_tree_view(self, flashes=2, duration_on=250, duration_off=250):
         """Change temporairement le style du TreeView pour attirer l'attention en le faisant clignoter.
@@ -778,3 +784,6 @@ class FileTreeWidget(QWidget):
                 self.tree_view.scrollTo(proxy_index)
                 # Faire clignoter pour attirer l'attention
                 self.highlight_tree_view()
+
+
+

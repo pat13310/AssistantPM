@@ -337,8 +337,6 @@ class ChatArboWidget(QWidget):
         input_layout.addWidget(self.send_btn)
         chat_panel.addLayout(input_layout)
 
-        # Les boutons d'action ont été déplacés dans la barre supérieure
-
         # Le bouton d'envoi a été déplacé à droite de la zone de saisie
 
         chat_right = QWidget()
@@ -449,6 +447,32 @@ class ChatArboWidget(QWidget):
         """
         )
 
+    def select_project_path(self, project_path):
+        """Définit le chemin du projet dans l'arborescence FileTreeWidget
+        
+        Args:
+            project_path (str): Chemin du répertoire du projet à définir
+            
+        Returns:
+            bool: True si le chemin a été défini avec succès, False sinon
+        """
+        if os.path.exists(project_path) and os.path.isdir(project_path):
+            # Mettre à jour le chemin du projet sélectionné
+            self.selected_project_path = project_path
+            # Définir ce chemin comme racine dans l'arborescence
+            self.file_tree.set_root_path(project_path)
+            # Mettre à jour le nom du projet
+            self.project_name = os.path.basename(project_path)
+            # Rafraîchir l'arborescence
+            self.file_tree.refresh_tree_view()
+            # Message de confirmation dans le chat
+            self.add_chat_bubble(f"Projet sélectionné : {self.project_name}", is_user=False)
+            return True
+        else:
+            # Message d'erreur dans le chat
+            self.add_chat_bubble(f"Erreur : Le chemin {project_path} n'existe pas ou n'est pas un répertoire.", is_user=False)
+            return False
+            
     def on_file_operation(self, action, path, success, is_dir):
         """Gère les signaux d'opérations sur les fichiers/dossiers
         
@@ -471,6 +495,17 @@ class ChatArboWidget(QWidget):
         if action == "delete":
             if success:
                 message = f"Le {item_type} <b>{item_name}</b> a été supprimé avec succès."
+                if is_dir:
+                    self.selected_project_path = None
+                    self.selected_app_type = None
+                    self.selected_app_name = None
+                    self.selected_app_path = None
+                    self.selected_language_name = None
+                    self.selected_language_path = None
+                    self.selected_technology = None
+                    self.selected_technology_path = None
+                    self.path_root = None
+                    self.wait_for_path = False
             else:
                 message = f"Échec de la suppression du {item_type} <b>{item_name}</b>."
         elif action == "create":
@@ -1965,7 +2000,8 @@ class ChatArboWidget(QWidget):
         # Utiliser la méthode du composant déporté pour mettre à jour l'arborescence
         self.file_tree.update_tree_view_and_select_folder(folder_path)
 
-        QTimer.singleShot(100, self.file_tree.highlight_tree_view)
+        #QTimer.singleShot(100, self.file_tree.highlight_tree_view)
+
 
     def add_project_name_input(self):
         """Ajoute une bulle interactive pour saisir le nom du projet"""
@@ -2145,14 +2181,14 @@ class ChatArboWidget(QWidget):
         self.project_name = project_name
 
         # Afficher un message de confirmation
-        self.add_chat_bubble(
-            f"<b>Nom du projet :</b> {project_name}",
-            is_user=True,
-            word_wrap=False,
-            icon_name="check",
-            icon_color="#4CAF50",
-            icon_size=24,
-        )
+        # self.add_chat_bubble(
+        #     f"<b>Nom du projet :</b> {project_name}",
+        #     is_user=True,
+        #     word_wrap=False,
+        #     icon_name="check",
+        #     icon_color="#4CAF50",
+        #     icon_size=24,
+        # )
 
         # Vérifier si un chemin racine a été sélectionné
         if not self.path_root:
@@ -2541,7 +2577,7 @@ class ChatArboWidget(QWidget):
             else:
                 # Message générique si nous n'avons pas d'informations sur le type de projet
                 self.add_chat_bubble(
-                    f"<b>Votre squelette d'application '<span style='color:#2196F3'>{self.project_name}</span>' est prêt !</b><br><br>"
+                    f"<b>Votre squelette d'application '<span style='color:#a0e0f7'>{self.project_name}</span>' est prêt !</b><br><br>"
                     f"Le dossier du projet a été {creation_status} :<br>"
                     f"<code>{project_path}</code><br><br>"
                     "Vous pouvez maintenant commencer à travailler sur votre application.",
@@ -2553,6 +2589,7 @@ class ChatArboWidget(QWidget):
 
             # Mettre à jour le TreeView pour afficher le nouveau répertoire
             self.update_tree_view_and_select_folder(project_path)
+            self.file_tree.set_root_path(project_path)
 
         except Exception as e:
             # En cas d'erreur, afficher un message d'erreur

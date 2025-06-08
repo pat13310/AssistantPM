@@ -366,13 +366,13 @@ class TopBarWidget(QFrame):
         """
         # Normaliser le chemin pour l'affichage et le tooltip
         full_path = path.replace('\\', '/')
-        
+        emoji = '📁'
         if len(path) <= 3 and (path.endswith(':') or path.endswith(':/') or path.endswith(':\\')):
             display_path = full_path
-            emoji = '📁'  # Emoji disque dur pour les lecteurs
+            #emoji = '📁'  # Emoji disque dur pour les lecteurs
         else:
             display_path = os.path.basename(path)
-            emoji = '📁' if is_dir else '📄'  # Dossier ou fichier
+            #emoji = '📁' if is_dir else '📄'  
             
         # Créer un message HTML avec l'emoji approprié
         html_message = f'<span style="font-size: 14px;">{emoji} <b>{display_path}</b></span>'

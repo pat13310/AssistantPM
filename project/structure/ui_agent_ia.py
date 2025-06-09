@@ -84,6 +84,7 @@ from action_types import (
 )
 from project_creator import ProjectCreator
 from project_creator_show import ProjectCreatorShow
+from project.structure.core.migration_adapter import ChatArboWidgetMigrationMixin
 
 # Import du FileTreeWidget depuis le module local
 from project.structure.file_tree_widget import (
@@ -185,9 +186,11 @@ from project.structure.conversation_manager import ConversationManager
 from project.structure.connection_worker import ConnectionWorker
 
 
-class ChatArboWidget(QWidget):
+class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
     def __init__(self, root_path=None):
         super().__init__()
+        # Initialiser le système de migration d'état
+        self._initialize_migration()
         self.setWindowTitle("Assistant IA - Gestion de Projets")
         self.resize(1400, 800)
 

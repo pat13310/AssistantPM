@@ -51,10 +51,10 @@ from PySide6.QtGui import (
     QPainter,
     QFontMetrics,
     QDesktopServices,
+    QKeyEvent,
 )
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtGui import QKeyEvent
 import httpx
 import json
 import os
@@ -63,11 +63,19 @@ import uuid
 import re
 import shutil
 
+# Import du CommandProcessor
+import sys
+import os
+
+# Ajouter le répertoire parent au chemin d'importation
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from core.command_processor import CommandProcessor, ActionCategory, UIAction
+
 # Import des classes depuis les fichiers séparés
 from topic_card import TopicCard
 from chat_bubble import ChatBubble
 from interactive_chat_bubble import InteractiveChatBubble
-from input_chat_bubble import InputChatBubble
+#from input_chat_bubble import InputChatBubble
 from path_confirmation_buttons import PathConfirmationButtons
 from action_confirmation_bubble import ActionConfirmationBubble
 from action_types import (
@@ -95,6 +103,7 @@ from project.structure.file_tree_widget import (
 from project_types_widget import ProjectTypesWidget
 from project_type_card import ProjectTypeCard
 from top_bar_widget import TopBarWidget
+from project.structure.ui.widgets.chat_panel import ChatPanel
 import sys
 import os
 
@@ -242,105 +251,25 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Widget d'arborescence prêt à être utilisé
         tree_widget = self.file_tree
 
-        # Chat Area
+        # Chat Area - Utiliser le nouveau composant ChatPanel
+        self.chat_panel = ChatPanel()
+
+        # Connecter les signaux du chat_panel aux méthodes de la fenêtre principale
+        self.chat_panel.message_sent.connect(self.on_message_sent)
+        self.chat_panel.clear_requested.connect(self.clear_conversation)
+
+        # Reconnexion des signaux de la barre supérieure qui étaient dans l'ancien code
+        self.chat_panel.top_bar.exportClicked.connect(self.export_conversation)
+        self.chat_panel.top_bar.skeletonClicked.connect(self.start_app_skeleton_wizard)
+        self.chat_panel.top_bar.historyClicked.connect(self.show_history)
+        self.chat_panel.top_bar.infoClicked.connect(self.show_project_info)
+        self.chat_panel.top_bar.checkConnectionClicked.connect(
+            self.check_server_connection
+        )
+
+        # Layout pour contenir le composant ChatPanel
         chat_panel = QVBoxLayout()
-
-        # Barre supérieure avec le composant TopBarWidget
-        self.top_bar = TopBarWidget()
-        # Connexion des signaux aux méthodes appropriées
-        self.top_bar.exportClicked.connect(self.export_conversation)
-        self.top_bar.clearClicked.connect(self.clear_conversation)
-        self.top_bar.skeletonClicked.connect(self.start_app_skeleton_wizard)
-        self.top_bar.historyClicked.connect(self.show_history)
-        self.top_bar.infoClicked.connect(self.show_project_info)
-        self.top_bar.checkConnectionClicked.connect(self.check_server_connection)
-        self.top_bar.modelChanged.connect(self.on_model_changed)
-
-        chat_panel.addWidget(self.top_bar)
-
-        # Séparateur horizontal
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        separator.setStyleSheet("background-color: #e0e0e0; margin: 5px 0;")
-        chat_panel.addWidget(separator)
-
-        # Scrollable chat bubbles
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.chat_widget = QWidget()
-        self.chat_layout = QVBoxLayout(self.chat_widget)
-        self.chat_layout.setAlignment(Qt.AlignTop)
-        self.scroll.setWidget(self.chat_widget)
-        chat_panel.addWidget(self.scroll, 4)
-
-        # Zone de saisie avec bouton d'envoi à droite
-        input_layout = QHBoxLayout()
-
-        # Zone de saisie sur une seule ligne avec hauteur réduite et gestion de la touche Entrée
-        self.user_input = MessageInputField()
-        self.user_input.setFixedHeight(40)  # Hauteur réduite
-        self.user_input.setPlaceholderText("Votre message...")
-        self.user_input.setVerticalScrollBarPolicy(
-            Qt.ScrollBarAlwaysOff
-        )  # Désactiver la barre de défilement verticale
-        self.user_input.setLineWrapMode(
-            QPlainTextEdit.NoWrap
-        )  # Désactiver le retour à la ligne automatique
-        self.user_input.enterPressed.connect(
-            self.send_message
-        )  # Connecter le signal enterPressed à send_message
-
-        # Style avec bordure verte lors du focus
-        self.user_input.setStyleSheet(
-            """
-            QPlainTextEdit {
-                border: 1px solid #555555;
-                border-radius: 4px;
-                padding: 4px;
-                background-color: #2a2a2a;
-                color: #e0e0e0;
-            }
-            QPlainTextEdit:focus {
-                border: 2px solid #4CAF50;
-            }
-        """
-        )
-        input_layout.addWidget(
-            self.user_input, 1
-        )  # Stretch factor 1 pour prendre l'espace disponible
-
-        # Bouton d'envoi à droite avec icône verte
-        self.send_btn = QPushButton()
-        self.send_btn.setFixedSize(40, 40)  # Carré pour un design plus moderne
-        send_pixmap = get_svg_icon("send-horizontal", size=24, color="#AAA")
-        if send_pixmap:
-            self.send_btn.setIcon(QIcon(send_pixmap))
-        self.send_btn.setIconSize(QSize(22, 22))
-
-        # Style du bouton d'envoi avec fond transparent et effet de survol pastel
-        self.send_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: transparent;
-                border-radius: 20px;
-                border: 1px solid #AAA;
-            }
-            QPushButton:hover {
-                background-color: rgba(76, 175, 80, 0.15); /* Vert pastel transparent */
-                border: 2px solid #66BB6A;
-            }
-            QPushButton:pressed {
-                background-color: rgba(76, 175, 80, 0.3);
-                border: 2px solid #388E3C;
-            }
-        """
-        )
-
-        input_layout.addWidget(self.send_btn)
-        chat_panel.addLayout(input_layout)
-
-        # Le bouton d'envoi a été déplacé à droite de la zone de saisie
+        chat_panel.addWidget(self.chat_panel)
 
         chat_right = QWidget()
         chat_right.setLayout(chat_panel)
@@ -354,8 +283,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         main_layout = QHBoxLayout(self)
         main_layout.addWidget(splitter)
 
-        self.send_btn.clicked.connect(self.send_message)
-        # Le signal clicked est déjà connecté via le composant déporté dans le constructeur
+        # Le composant ChatPanel gère maintenant ses propres événements de bouton
 
         self.stream_thread = None
 
@@ -372,7 +300,113 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
 
         # Ajouter un message de bienvenue après avoir initialisé toutes les variables
         welcome_message = "<b>Bienvenue dans l'Assistant IA !</b><br><br>Vous pouvez naviguer dans l'arborescence à gauche et discuter avec l'IA à droite.<br>N'hésitez pas à poser des questions ou à demander de l'aide."
-        self.add_chat_bubble(welcome_message, is_user=False)
+        self.chat_panel.add_ai_message(welcome_message)
+
+    def __init_command_processor(self):
+        """
+        Initialise le processeur de commandes
+        """
+        self.command_processor = CommandProcessor()
+
+    def on_message_sent(self, message_text):
+        """
+        Gère l'envoi d'un message par l'utilisateur via le composant ChatPanel
+        """
+        # Vérifier que le message n'est pas vide
+        if not message_text.strip():
+            return
+
+        # Initialiser le processeur de commandes si nécessaire
+        if not hasattr(self, "command_processor"):
+            self.__init_command_processor()
+
+        # Analyser le message pour détecter les commandes
+        cmd_result = self.command_processor.process_command(message_text)
+
+        # Traiter la commande d'aide spéciale
+        if cmd_result.is_help_command:
+            # Utiliser la méthode du ChatPanel pour afficher les cartes d'aide
+            self.chat_panel.show_help_cards()
+            return
+
+        # Le message utilisateur est déjà ajouté par le ChatPanel
+
+        # Si le serveur n'est pas connecté, afficher un message d'erreur
+        if not self.server_connected:
+            self.chat_panel.add_ai_message(
+                "<span style='color: #ff6060;'>Le serveur IA n'est pas connecté. Veuillez vérifier la connexion.</span>"
+            )
+            return
+
+        # Ajouter le message à la conversation actuelle
+        self.current_conversation.append({"role": "user", "content": message_text})
+
+        # Vérifier si nous avons une commande à traiter avant d'envoyer à l'IA
+        if cmd_result.is_command:
+            # Récupérer l'icône pour l'action
+            from core.command_processor import ActionType
+
+            action_icon, action_color = ActionType.get_icon_for_action(
+                cmd_result.category, cmd_result.action
+            )
+
+            # Vous pouvez ajouter ici le code pour traiter les différents types de commandes
+            # selon cmd_result.category et cmd_result.action
+            # ...
+
+        # Si ce n'est pas une commande ou après traitement, envoyer à l'IA
+        # Pour l'exemple, ajoutons une réponse simple
+        response = "J'ai reçu votre message: " + message_text
+        self.chat_panel.add_ai_message(response)
+
+        # Ajouter la réponse à la conversation
+        self.current_conversation.append({"role": "assistant", "content": response})
+
+    def clear_conversation(self):
+        """
+        Efface la conversation actuelle et remet à zéro l'historique
+        """
+        # Réinitialiser la conversation courante
+        self.current_conversation = []
+        self.current_conversation_id = str(uuid.uuid4())
+
+        # Ajouter un message de bienvenue
+        welcome_message = "<b>Nouvelle conversation commencée.</b><br>Comment puis-je vous aider aujourd'hui?"
+        self.chat_panel.add_ai_message(welcome_message)
+
+    def show_project_info(self):
+        """
+        Affiche les informations du projet courant dans le chat
+        """
+        # Vérifier si un projet est sélectionné
+        if not self.selected_project_path:
+            self.chat_panel.add_ai_message(
+                "<b>Aucun projet sélectionné.</b><br>Veuillez d'abord sélectionner un projet dans l'arborescence."
+            )
+            return
+
+        # Récupérer les informations du projet
+        project_name = self.project_name or os.path.basename(self.selected_project_path)
+
+        # Construire le message d'aide
+        help_message = f"""<b>Informations du projet</b><br><br>
+        <b>Nom du projet:</b> {project_name}<br>
+        <b>Chemin:</b> {self.selected_project_path}<br><br>
+        
+        <b>Fonctionnalités disponibles:</b><br>
+        - <b>Chat avec l'IA</b> pour obtenir de l'aide sur votre projet<br>
+        - <b>Navigation</b> dans les fichiers du projet<br>
+        - <b>Génération de code</b> et conseils de développement<br>
+        - <b>Création de squelettes</b> d'applications<br><br>
+        
+        <b>Commandes utiles:</b><br>
+        - "Explique ce code" pour comprendre un fichier sélectionné<br>
+        - "Génère un composant pour..." pour créer un nouveau fichier<br>
+        - "Analyse la structure du projet" pour obtenir un aperçu global<br>
+        """
+
+        # Afficher le message d'aide dans le chat
+        self.chat_panel.add_ai_message(help_message)
 
         # Style global moderne et professionnel
         self.setStyleSheet(
@@ -433,6 +467,17 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
                 background-color: #2a2a2a;
                 color: #e0e0e0;
             }
+            /* Exception pour le champ de saisie de message */
+            MessageInputField {
+                background-color: white;
+                color: black;
+                border: 1px solid #e0e0e0;
+                font-weight: bold;
+            }
+            MessageInputField:focus {
+                border: 2px solid #4CAF50;
+                background-color: #f9fff9;
+            }
             QScrollArea {
                 border: none;
                 background-color: transparent;
@@ -452,10 +497,10 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
 
     def select_project_path(self, project_path):
         """Définit le chemin du projet dans l'arborescence FileTreeWidget
-        
+
         Args:
             project_path (str): Chemin du répertoire du projet à définir
-            
+
         Returns:
             bool: True si le chemin a été défini avec succès, False sinon
         """
@@ -469,16 +514,21 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             # Rafraîchir l'arborescence
             self.file_tree.refresh_tree_view()
             # Message de confirmation dans le chat
-            self.add_chat_bubble(f"Projet sélectionné : {self.project_name}", is_user=False)
+            self.add_chat_bubble(
+                f"Projet sélectionné : {self.project_name}", is_user=False
+            )
             return True
         else:
             # Message d'erreur dans le chat
-            self.add_chat_bubble(f"Erreur : Le chemin {project_path} n'existe pas ou n'est pas un répertoire.", is_user=False)
+            self.add_chat_bubble(
+                f"Erreur : Le chemin {project_path} n'existe pas ou n'est pas un répertoire.",
+                is_user=False,
+            )
             return False
-            
+
     def on_file_operation(self, action, path, success, is_dir):
         """Gère les signaux d'opérations sur les fichiers/dossiers
-        
+
         Args:
             action (str): Type d'action effectuée ("create", "delete", etc.)
             path (str): Chemin du fichier/dossier concerné
@@ -486,18 +536,22 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             is_dir (bool): Indique si l'élément est un dossier (True) ou un fichier (False)
         """
         # Définir les messages et icônes en fonction de l'action et du résultat
-        icon_color = "#4CAF50" if success else "#F44336"  # Vert si succès, rouge si échec
-        
+        icon_color = (
+            "#4CAF50" if success else "#F44336"
+        )  # Vert si succès, rouge si échec
+
         # Obtenir le nom du fichier/dossier sans le chemin complet
         item_name = os.path.basename(path)
-        
+
         # Déterminer le type d'élément (fichier ou dossier) à partir du paramètre is_dir
         item_type = "dossier" if is_dir else "fichier"
-        
+
         # Créer un message différent selon l'action
         if action == "delete":
             if success:
-                message = f"Le {item_type} <b>{item_name}</b> a été supprimé avec succès."
+                message = (
+                    f"Le {item_type} <b>{item_name}</b> a été supprimé avec succès."
+                )
                 if is_dir:
                     self.selected_project_path = None
                     self.selected_app_type = None
@@ -519,39 +573,33 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         else:
             # Pour d'autres types d'actions
             if success:
-                message = f"Opération '{action}' réussie sur {item_type} <b>{item_name}</b>."
+                message = (
+                    f"Opération '{action}' réussie sur {item_type} <b>{item_name}</b>."
+                )
             else:
                 message = f"Échec de l'opération '{action}' sur {item_type} <b>{item_name}</b>."
-        
-        # Afficher une bulle de notification
-        self.clear_bubbles()
 
-        self.add_chat_bubble(
-            message,
-            is_user=False,
-            icon_color="#FFFFFF",
-            word_wrap=False,
-            icon_name="info",
-            icon_size=24
-        )
-    
+        # Afficher une notification via le ChatPanel
+        # Pas besoin de clear_bubbles ici, juste ajouter le nouveau message
+        self.chat_panel.add_ai_message(message)
+
     def on_tree_item_clicked(self, path, is_dir):
         """Gère le clic sur un élément de l'arborescence"""
         # self.clear_bubbles()
 
         # Afficher le chemin sélectionné dans la barre d'état
         print(f"Chemin sélectionné: {os.path.basename(path)}")
-        
+
         # Utiliser la nouvelle méthode pour afficher le chemin sélectionné
         if not is_dir:
             # Si c'est un fichier, afficher le chemin du répertoire parent
-            self.top_bar.update_selected_path(os.path.dirname(path), is_dir)
-            self.path_root = os.path.dirname(path) 
+            self.chat_panel.top_bar.update_selected_path(os.path.dirname(path), is_dir)
+            self.path_root = os.path.dirname(path)
         else:
             # Si c'est un répertoire, afficher le chemin complet
-            self.top_bar.update_selected_path(path, is_dir)
-            self.path_root = path        
-        
+            self.chat_panel.top_bar.update_selected_path(path, is_dir)
+            self.path_root = path
+
         self.selected_project_path = self.path_root
 
         # Si on attend la sélection d'un dossier pour la création de projet
@@ -569,281 +617,17 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
                 word_wrap=False,
             )
 
-            # Afficher les types de projets disponibles
-            self.display_project_types()
-
+            
             # Marquer que nous avons géré l'attente du chemin
             self.wait_for_path = False
         else:
             # Pour les autres cas de clic sur le TreeView, on ne fait rien de spécial
             pass
 
-    def display_project_types(self):
-        """Affiche les types de projets disponibles en grille de 4 colonnes avec ProjectTypeCard"""
-
-        # Initialiser ProjectCreatorShow si ce n'est pas déjà fait
-        if not hasattr(self, "project_show") or self.project_show is None:
-            self.project_show = ProjectCreatorShow()
-            self.project_show.technology_selected.connect(self.on_technology_selected)
-            self.project_show.app_type_selected.connect(self.on_app_type_selected)
-            self.project_show.feature_selected.connect(self.on_feature_selected)
-            self.project_show.project_creation_requested.connect(
-                self.on_project_creation_requested
-            )
-
-        # Effacer les bulles précédentes
-        self.clear_bubbles()
-
-        # Obtenir les données des types de projets
-        project_types = self.project_show.get_project_types_data()
-
-        # Créer un message pour introduire les types de projets
-        intro_bubble = self.add_chat_bubble(
-            "Sélectionnez un type de projet :",
-            is_user=False,
-            word_wrap=False,
-            icon_name="hand-helping",
-            icon_color="#FFFFFF",
-            icon_size=24,
-        )
-        intro_bubble.setProperty("project_type_bubble", True)
-
-        # Créer un conteneur pour la grille
-        grid_container = QWidget()
-        grid_container.setStyleSheet("background-color: transparent;")
-        grid_container.setProperty("project_type_bubble", True)
-        grid_layout = QGridLayout(grid_container)
-        grid_layout.setContentsMargins(8, 8, 8, 8)
-        grid_layout.setSpacing(10)
-        grid_layout.setHorizontalSpacing(
-            15
-        )  # Plus d'espace horizontal entre les colonnes
-
-        # Ajouter le conteneur au chat
-        self.chat_layout.addWidget(grid_container)
-
-        # Créer les cartes de types de projet pour la grille
-        num_columns = 4  # Nombre de colonnes dans la grille (2 colonnes pour des cartes plus larges)
-        for i, project_type in enumerate(project_types):
-            print(
-                f"Traitement du type de projet {i+1}/{len(project_types)}: {project_type['name']}"
-            )
-
-            # Calculer la position dans la grille (row, column)
-            row = i // num_columns
-            col = i % num_columns
-
-            try:
-                # Créer une carte pour le type de projet
-                card = ProjectTypeCard(project_type)
-
-                # Stocker l'ID du type de projet dans la propriété de la carte
-                card.setProperty("project_type_id", project_type["id"])
-
-                # Connecter le signal de clic de la carte
-                # Utiliser une fonction spécifique pour éviter les problèmes de portée avec lambda
-                def create_project_type_click_handler(pt_id):
-                    return lambda: self.on_project_type_selected(pt_id)
-
-                card.clicked.connect(
-                    create_project_type_click_handler(project_type["id"])
-                )
-
-                # Stocker l'ID du type de projet dans la propriété de la carte pour le nettoyage
-                card.setProperty("project_type_bubble", True)
-
-                # Ajouter la carte à la grille
-                grid_layout.addWidget(card, row, col)
-            except Exception as e:
-                pass
-
-        # Ajouter des widgets vides pour compléter la dernière ligne et maintenir l'alignement à gauche
-        total_items = len(project_types)
-        if total_items % num_columns != 0:
-            # Calculer combien de widgets vides il faut ajouter
-            empty_slots = num_columns - (total_items % num_columns)
-            last_row = total_items // num_columns
-            # Ajouter les widgets vides
-            for i in range(empty_slots):
-                empty_widget = QWidget()
-                empty_widget.setFixedSize(200, 150)  # Taille approximative d'une carte
-                empty_widget.setStyleSheet("background-color: transparent;")
-                empty_widget.setProperty("project_type_bubble", True)
-                grid_layout.addWidget(
-                    empty_widget, last_row, (total_items % num_columns) + i
-                )
-
-    def on_project_type_selected(self, project_type_id):
-        """Appelé lorsqu'un type de projet est sélectionné"""
-        # Appliquer un effet visuel aux cartes pour montrer celle qui est sélectionnée
-        # et désactiver les autres
-        for widget in self.findChildren(QWidget):
-            if widget.property("project_type_bubble") and isinstance(
-                widget, ProjectTypeCard
-            ):
-                if widget.property("project_type_id") == project_type_id:
-                    # Mettre en évidence la carte sélectionnée
-                    widget.set_selected(True)
-                else:
-                    # Désactiver les autres cartes
-                    widget.setEnabled(False)
-                    widget.set_selected(False)
-
-        # Vérifier si ProjectCreatorShow est initialisé
-        if not hasattr(self, "project_show"):
-            self.project_show = ProjectCreatorShow()
-            # Connecter les signaux
-            self.project_show.technology_selected.connect(self.on_technology_selected)
-            self.project_show.app_type_selected.connect(self.on_app_type_selected)
-            self.project_show.feature_selected.connect(self.on_feature_selected)
-            self.project_show.project_creation_requested.connect(
-                self.on_project_creation_requested
-            )
-
-        # Stocker le type de projet sélectionné
-        self.selected_project_type = project_type_id
-
-        # Utiliser ProjectCreatorShow pour sélectionner le type de projet
-        technologies = self.project_show.select_project_type(project_type_id)
-
-        # Effacer les messages précédents pour éviter les doublons
-        self.clear_bubbles()
-
-        # Afficher les technologies disponibles pour ce type de projet
-        self.display_technologies_for_project_type(project_type_id)
-
-    def display_technologies_for_project_type(self, project_type_id):
-        """Affiche les technologies disponibles pour un type de projet en utilisant ProjectTypeCard"""
-        # Effacer les bulles de technologies précédentes
-        self.clear_bubbles()
-
-        # Ajouter un bouton de retour pour revenir à la sélection des types de projets
-        from project.structure.back_button import BackButton
-
-        back_button = BackButton("« Retour aux types de projets")
-        back_button.clicked.connect(self.handle_back_to_project_types)
-
-        # Ajouter le bouton au layout
-        back_container = QWidget()
-        back_layout = QHBoxLayout(back_container)
-        back_layout.setContentsMargins(10, 5, 10, 5)
-        back_layout.addWidget(back_button)
-        back_layout.addStretch(1)
-
-        back_container.setProperty("tech_bubble", True)
-        self.chat_layout.addWidget(back_container)
-
-        # Obtenir les données des technologies
-        tech_data = self.project_show.get_technologies_data(project_type_id)
-        technologies = tech_data["technologies"]
-        project_type_name = tech_data["project_type_name"]
-        project_color = tech_data["project_color"]
-
-        # Créer un message pour introduire les technologies
-        intro_bubble = self.add_chat_bubble(
-            f"Sélectionnez une technologie pour {project_type_name} :",
-            is_user=False,
-            word_wrap=False,
-            icon_name="hand-helping",
-            icon_color="#FFFFFF",
-            icon_size=24,
-        )
-        intro_bubble.setProperty("tech_bubble", True)
-
-        # Créer un conteneur pour la grille
-        grid_container = QWidget()
-        grid_container.setStyleSheet("background-color: transparent;")
-        grid_container.setProperty("tech_bubble", True)
-        grid_layout = QGridLayout(grid_container)
-        grid_layout.setContentsMargins(8, 8, 8, 8)
-        grid_layout.setSpacing(10)
-        grid_layout.setHorizontalSpacing(
-            15
-        )  # Plus d'espace horizontal entre les colonnes
-
-        # Ajouter le conteneur au chat
-        self.chat_layout.addWidget(grid_container)
-
-        # Créer les cartes de technologies pour la grille
-        num_columns = 4  # Nombre de colonnes dans la grille
-        for i, tech in enumerate(technologies):
-            # Calculer la position dans la grille (row, column)
-            row = i // num_columns
-            col = i % num_columns
-
-            try:
-                # Adapter la technologie au format attendu par ProjectTypeCard
-                tech_data_for_card = {
-                    "id": tech["id"],
-                    "name": tech["name"],
-                    "description": tech.get("description", ""),
-                    "icon": tech.get("icon", "code"),
-                    "color": project_color,  # Utiliser la couleur du type de projet parent
-                }
-
-                # Créer une carte pour la technologie
-                card = ProjectTypeCard(tech_data_for_card)
-
-                # Stocker les ID dans les propriétés de la carte
-                card.setProperty("tech_id", tech["id"])
-                card.setProperty("project_type_id", project_type_id)
-
-                # Connecter le signal de clic de la carte à la méthode de sélection de technologie
-                # Utiliser une fonction spécifique pour éviter les problèmes de portée avec lambda
-                def create_tech_click_handler(tech_id, pt_id):
-                    return lambda: self.on_technology_selected_with_project_type(
-                        tech_id, pt_id
-                    )
-
-                card.clicked.connect(
-                    create_tech_click_handler(tech["id"], project_type_id)
-                )
-
-                # Stocker les ID pour le nettoyage
-                card.setProperty("tech_bubble", True)
-                card.setProperty("tech_id", tech["id"])
-                card.setProperty("project_type_id", project_type_id)
-
-                # Ajouter la carte à la grille
-                grid_layout.addWidget(card, row, col)
-
-                print(f"Carte de technologie ajoutée: {tech['name']}")
-            except Exception as e:
-                print(
-                    f"[ERREUR] Échec de création de la carte pour {tech['name']}: {str(e)}"
-                )
-
-        # Ajouter des widgets vides pour compléter la dernière ligne et maintenir l'alignement à gauche
-        total_items = len(technologies)
-        if total_items % num_columns != 0:
-            # Calculer combien de widgets vides il faut ajouter
-            empty_slots = num_columns - (total_items % num_columns)
-            last_row = total_items // num_columns
-            # Ajouter les widgets vides
-            for i in range(empty_slots):
-                empty_widget = QWidget()
-                empty_widget.setFixedSize(200, 150)  # Taille approximative d'une carte
-                empty_widget.setStyleSheet("background-color: transparent;")
-                empty_widget.setProperty("tech_bubble", True)
-                grid_layout.addWidget(
-                    empty_widget, last_row, (total_items % num_columns) + i
-                )
-
-        # Code obsolète supprimé
-
+    
     def on_technology_selected_with_project_type(self, tech_id, project_type_id):
-        """Appelé lorsqu'une carte de technologie est cliquée"""
-        # Appliquer un effet visuel aux cartes pour montrer celle qui est sélectionnée
-        # et désactiver les autres
-        for widget in self.findChildren(QWidget):
-            if widget.property("tech_bubble") and isinstance(widget, ProjectTypeCard):
-                if widget.property("tech_id") == tech_id:
-                    # Mettre en évidence la carte sélectionnée
-                    widget.set_selected(True)
-                else:
-                    # Désactiver les autres cartes
-                    widget.setEnabled(False)
-                    widget.set_selected(False)
+        """Appelé lorsqu'une technologie est sélectionnée dans TechnologiesGrid"""
+        # Plus besoin de manipuler directement les cartes car elles sont gérées par TechnologiesGrid
 
         print(
             f"Carte de technologie cliquée: {tech_id} pour le type de projet: {project_type_id}"
@@ -1075,7 +859,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             and ("aide" in text_lower or "help" in text_lower)
         ):
             # Afficher les cartes de rubriques sans message de salutation
-            self.add_topic_cards_bubble()
+            self.chat_panel.show_help_cards()
             return
 
         # Exécuter l'action si elle a été identifiée
@@ -1253,111 +1037,10 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             "icon_name": icon_name,  # Stocker l'information sur l'icône
         }
         self.current_conversation.append(message_data)
-
-        # Faire défiler vers le bas après un court délai pour s'assurer que le widget est complètement rendu
-        QTimer.singleShot(50, self.scroll_to_bottom)
-
+        
         return bubble_container
 
-    def add_topic_cards_bubble(self):
-        """Affiche des bulles individuelles pour chaque rubrique d'aide"""
-        # Définir les rubriques disponibles
-        topics = [
-            {
-                "title": "Création de projet",
-                "description": "Créer un nouveau squelette de projet avec différentes technologies",
-                "icon": "code",
-            },
-            {
-                "title": "Navigation fichiers",
-                "description": "Explorer et interagir avec les fichiers de votre projet",
-                "icon": "folder-code",
-            },
-            {
-                "title": "Aide au codage",
-                "description": "Obtenir de l'aide pour résoudre des problèmes de code",
-                "icon": "circle-help",
-            },
-            {
-                "title": "Suggestions d'amélioration",
-                "description": "Recevoir des suggestions pour améliorer votre code",
-                "icon": "brain",
-            },
-            {
-                "title": "Documentation",
-                "description": "Générer de la documentation pour votre code",
-                "icon": "file-text",
-            },
-        ]
-
-        # Ajouter un titre pour les options d'aide
-        title_bubble = ChatBubble(
-            "<b>Comment puis-je vous aider aujourd'hui ?</b>", is_user=False
-        )
-        title_layout = QHBoxLayout()
-        title_layout.setContentsMargins(0, 0, 0, 0)
-        title_layout.addWidget(title_bubble)
-        title_layout.addStretch(1)  # Espace à droite pour aligner à gauche
-
-        title_container = QWidget()
-        title_container.setLayout(title_layout)
-        self.chat_layout.addWidget(title_container)
-
-        # Créer un conteneur principal pour toutes les bulles de topics
-        main_container = QWidget()
-        main_layout = QHBoxLayout(
-            main_container
-        )  # Layout vertical pour empiler les cartes
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(8)
-
-        # Créer une bulle pour chaque topic
-        for topic in topics:
-            # Créer une carte pour le topic
-            icon_name = topic.get("icon", "circle-help")
-
-            # Chemin vers le fichier SVG original
-            icon_path = os.path.join(
-                os.path.dirname(
-                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                ),
-                "assets",
-                "icons",
-                f"{icon_name}.svg",
-            )
-
-            # Créer un fichier SVG temporaire coloré en vert
-            # temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
-            # svg_path = os.path.join(icon_path, f"{icon_name}.svg")
-
-            # Créer la carte avec l'icône SVG verte
-            card = TopicCard(
-                title=topic["title"],
-                description=topic["description"],
-                icon_pixmap=icon_path,
-            )
-
-            card.clicked.connect(
-                lambda checked=False, t=topic["title"]: self.handle_topic_selection(t)
-            )
-
-            # Conteneur horizontal pour centrer la bulle
-            card_layout = QHBoxLayout()
-            card_layout.setContentsMargins(0, 0, 0, 0)
-            card_layout.addStretch(1)  # Espace à gauche pour centrer
-            card_layout.addWidget(card)
-            card_layout.addStretch(1)  # Espace à droite pour centrer
-
-            # Ajouter le layout horizontal au layout principal
-            card_container = QWidget()
-            card_container.setLayout(card_layout)
-            main_layout.addWidget(card_container)
-
-        # Ajouter le conteneur principal au chat
-        self.chat_layout.addWidget(main_container)
-
-        # Faire défiler vers le bas
-        QTimer.singleShot(50, self.scroll_to_bottom)
+    # La méthode add_topic_cards_bubble a été déplacée dans la classe ChatPanel
 
     def handle_topic_selection(self, topic):
         """Gère la sélection d'une rubrique"""
@@ -1430,9 +1113,8 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Connecter le signal de sélection
         interactive_bubble.choiceSelected.connect(self.on_interactive_choice)
 
-        # Faire défiler vers le bas après un court délai
-        QTimer.singleShot(50, self.scroll_to_bottom)
-
+        return bubble_container
+    
     def add_action_confirmation_bubble(
         self, action_text, icon_name="code", icon_color="#FFFFFF", icon_size=20
     ):
@@ -1463,9 +1145,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         bubble_container.setLayout(bubble_layout)
         self.chat_layout.addWidget(bubble_container)
 
-        # Faire défiler vers le bas après un court délai
-        QTimer.singleShot(50, self.scroll_to_bottom)
-
+        
         return action_bubble
 
     def on_interactive_choice(self, bubble_type, choice):
@@ -1554,163 +1234,14 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         self.add_chat_bubble("Sélection annulée. Vous pouvez recommencer.")
 
     def on_technology_selected(self, technology_id):
-        """Gère la sélection d'une technologie"""
-        print(f"Technologie sélectionnée: {technology_id}")
+        pass
 
-        # Afficher les langages de programmation disponibles pour cette technologie
-        self.display_programming_languages(technology_id)
-
-        # Ajouter une action pour afficher les détails de la technologie
-        # self.add_action_confirmation_bubble(
-        #     "Afficher les détails de la technologie",
-        #     self.display_technology_details,
-        #     "Annuler",
-        #     self.cancel_technology_details,
-        # )
-
-    def display_technology_details(self):
-        """Affiche les détails de la technologie sélectionnée"""
-        # Récupérer les détails de la technologie
-        technology_details = self.project_show.get_technology_details()
-
-        # Afficher les détails
-        self.add_chat_bubble(
-            f"Nom de la technologie: {technology_details['name']}\n"
-            f"Description: {technology_details['description']}\n"
-            f"Avantages: {', '.join(technology_details['advantages'])}\n"
-            f"Inconvénients: {', '.join(technology_details['disadvantages'])}"
-        )
-
+    
     def cancel_technology_details(self):
         """Annule l'affichage des détails de la technologie"""
         self.add_chat_bubble("Affichage des détails annulé.")
 
-    def display_programming_languages(self, technology_id):
-        """Affiche les langages de programmation disponibles pour une technologie en utilisant ProjectTypeCard"""
-        # Nettoyer les anciennes bulles de langages
-        self.clear_bubbles()
-
-        # Ajouter un bouton de retour pour revenir à la sélection des technologies
-        from project.structure.back_button import BackButton
-
-        back_button = BackButton("« Retour aux technologies")
-        back_button.clicked.connect(lambda: self.handle_back_to_technologies())
-
-        # Ajouter le bouton au layout
-        back_container = QWidget()
-        back_layout = QHBoxLayout(back_container)
-        back_layout.setContentsMargins(10, 5, 10, 5)
-        back_layout.addWidget(back_button)
-        back_layout.addStretch(1)
-
-        back_container.setProperty("language_bubble", True)
-        self.chat_layout.addWidget(back_container)
-
-        # Obtenir les données des langages de programmation
-        lang_data = self.project_show.get_programming_languages_data(technology_id)
-        languages = lang_data["languages"]
-        technology_name = lang_data["technology_name"]
-        color = lang_data["color"]
-
-        print(f"Affichage de {len(languages)} langages pour {technology_name}")
-
-        # Si aucun langage n'est disponible, afficher un message et terminer
-        if not languages:
-            message = self.add_chat_bubble(
-                f"Aucun langage spécifique n'est nécessaire pour {technology_name}. Passons à l'étape suivante.",
-                is_user=False,
-            )
-            message.setProperty("language_bubble", True)
-            return
-
-        # Créer un message pour introduire les langages
-        intro_bubble = self.add_chat_bubble(
-            f"Sélectionnez un langage de programmation pour {technology_name} :",
-            is_user=False,
-            icon_name="hand-helping",
-            icon_color="#FFFFFF",
-            icon_size=24,
-            word_wrap=False,
-        )
-        intro_bubble.setProperty("language_bubble", True)
-
-        # Créer un conteneur pour la grille
-        grid_container = QWidget()
-        grid_container.setStyleSheet("background-color: transparent;")
-        grid_container.setProperty("language_bubble", True)
-        grid_layout = QGridLayout(grid_container)
-        grid_layout.setContentsMargins(8, 8, 8, 8)
-        grid_layout.setSpacing(10)
-        grid_layout.setHorizontalSpacing(
-            15
-        )  # Plus d'espace horizontal entre les colonnes
-
-        # Ajouter le conteneur au chat
-        self.chat_layout.addWidget(grid_container)
-
-        # Créer les cartes de langages pour la grille
-        num_columns = 4  # Nombre de colonnes dans la grille
-        for i, lang in enumerate(languages):
-            # Calculer la position dans la grille (row, column)
-            row = i // num_columns
-            col = i % num_columns
-
-            try:
-                # Adapter le langage au format attendu par ProjectTypeCard
-                lang_data_for_card = {
-                    "id": lang["id"],
-                    "name": lang["name"],
-                    "description": lang.get("description", ""),
-                    "icon": lang.get("icon", "code"),
-                    "color": color,  # Utiliser la couleur de la technologie parent
-                }
-
-                # Créer une carte pour le langage
-                card = ProjectTypeCard(lang_data_for_card)
-
-                # Stocker les ID dans les propriétés de la carte
-                card.setProperty("language_id", lang["id"])
-                card.setProperty("technology_id", technology_id)
-
-                # Connecter le signal de clic de la carte à la méthode de sélection de langage
-                # Utiliser une fonction spécifique pour éviter les problèmes de portée avec lambda
-                def create_language_click_handler(lang_id, tech_id):
-                    return lambda: self.on_language_selected(lang_id, tech_id)
-
-                card.clicked.connect(
-                    create_language_click_handler(lang["id"], technology_id)
-                )
-
-                # Stocker les ID pour le nettoyage
-                card.setProperty("language_bubble", True)
-                card.setProperty("language_id", lang["id"])
-                card.setProperty("technology_id", technology_id)
-
-                # Ajouter la carte à la grille
-                grid_layout.addWidget(card, row, col)
-
-                print(f"Carte de langage ajoutée: {lang['name']}")
-            except Exception as e:
-                print(
-                    f"[ERREUR] Échec de création de la carte pour {lang['name']}: {str(e)}"
-                )
-
-        # Ajouter des widgets vides pour compléter la dernière ligne et maintenir l'alignement à gauche
-        total_items = len(languages)
-        if total_items % num_columns != 0:
-            # Calculer combien de widgets vides il faut ajouter
-            empty_slots = num_columns - (total_items % num_columns)
-            last_row = total_items // num_columns
-            # Ajouter les widgets vides
-            for i in range(empty_slots):
-                empty_widget = QWidget()
-                empty_widget.setFixedSize(200, 150)  # Taille approximative d'une carte
-                empty_widget.setStyleSheet("background-color: transparent;")
-                empty_widget.setProperty("language_bubble", True)
-                grid_layout.addWidget(
-                    empty_widget, last_row, (total_items % num_columns) + i
-                )
-
+    
     def on_language_selected(self, lang_id, technology_id):
         """Gère la sélection d'un langage de programmation"""
         # Appliquer un effet visuel aux cartes pour montrer celle qui est sélectionnée
@@ -1867,36 +1398,30 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Ajouter le conteneur au layout principal
         self.chat_layout.addWidget(project_subtype_container)
 
-    def clear_bubbles(self):
-        """Efface tous les widgets du chat"""
-        while self.chat_layout.count() > 0:
-            item = self.chat_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
+    
     def handle_back_to_project_types(self):
         """Gère le retour à la sélection des types de projets en effaçant d'abord le contenu"""
-        # Effacer tous les widgets dans le chat
-        self.clear_bubbles()
-
-        # Afficher les types de projets
-        self.display_project_types()
+        pass
 
     def handle_back_to_technologies(self):
         """Gère le retour à la sélection des technologies en effaçant d'abord le contenu"""
-        # Effacer tous les widgets dans le chat
-        self.clear_bubbles()
-
-        # Afficher les technologies pour le type de projet sélectionné
-        self.display_technologies_for_project_type(self.selected_project_type)
-
+        # Nettoyer spécifiquement le composant de langages s'il existe
+        if hasattr(self, "languages_grid") and self.languages_grid is not None:
+            try:
+                # Déconnecter les signaux
+                self.languages_grid.language_selected.disconnect(self.on_language_selected)
+                self.languages_grid.back_requested.disconnect(self.handle_back_to_technologies)
+                
+                # Supprimer le widget du layout
+                self.chat_panel.chat_layout.removeWidget(self.languages_grid)
+                self.languages_grid.deleteLater()
+                self.languages_grid = None
+            except Exception as e:
+                print(f"[ATTENTION] Erreur lors du nettoyage du composant languages_grid: {str(e)}")
+        
+        
     def handle_back_to_languages(self, technology_id):
-        """Gère le retour à la sélection des langages en effaçant d'abord le contenu"""
-        # Effacer tous les widgets dans le chat
-        self.clear_bubbles()
-
-        # Afficher les langages pour la technologie sélectionnée
-        self.display_programming_languages(technology_id)
+        pass
 
     def on_project_subtype_selected(
         self, subtype_id, project_type_id, technology_id, language_id
@@ -2003,8 +1528,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Utiliser la méthode du composant déporté pour mettre à jour l'arborescence
         self.file_tree.update_tree_view_and_select_folder(folder_path)
 
-        #QTimer.singleShot(100, self.file_tree.highlight_tree_view)
-
+        # QTimer.singleShot(100, self.file_tree.highlight_tree_view)
 
     def add_project_name_input(self):
         """Ajoute une bulle interactive pour saisir le nom du projet"""
@@ -2125,9 +1649,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Ajouter la bulle au chat
         self.chat_layout.addWidget(bubble_container)
 
-        # Faire défiler vers le bas après un court délai
-        QTimer.singleShot(50, self.scroll_to_bottom)
-
+        
         # Mettre le focus sur le champ de saisie
         self.project_name_input.setFocus()
 
@@ -2151,10 +1673,6 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         self.input_chat_bubble.projectNameSubmitted.connect(
             self.on_project_name_submitted
         )
-
-        # Faire défiler vers le bas après un court délai
-        QTimer.singleShot(50, self.scroll_to_bottom)
-
         # Mettre le focus sur le champ de saisie
         self.input_chat_bubble.project_name_input.setFocus()
 
@@ -2183,16 +1701,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Stocker le nom du projet
         self.project_name = project_name
 
-        # Afficher un message de confirmation
-        # self.add_chat_bubble(
-        #     f"<b>Nom du projet :</b> {project_name}",
-        #     is_user=True,
-        #     word_wrap=False,
-        #     icon_name="check",
-        #     icon_color="#4CAF50",
-        #     icon_size=24,
-        # )
-
+        
         # Vérifier si un chemin racine a été sélectionné
         if not self.path_root:
             # Aucun chemin sélectionné, demander à l'utilisateur d'en sélectionner un
@@ -2225,9 +1734,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         self.path_confirmation.pathConfirmed.connect(self.on_path_confirmed)
         self.path_confirmation.pathRejected.connect(self.on_path_rejected)
 
-        # Faire défiler vers le bas
-        QTimer.singleShot(50, self.scroll_to_bottom)
-
+        
     def is_path_allowed(self, path):
         """Vérifie si un chemin est autorisé pour la création de répertoires
 
@@ -2304,8 +1811,6 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
                 icon_color="#F44336",
                 icon_size=24,
             )
-            # Faire défiler vers le bas
-            QTimer.singleShot(50, self.scroll_to_bottom)
             return
 
         # Créer directement le répertoire du projet sans demander de confirmation supplémentaire
@@ -2419,9 +1924,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Ajouter la bulle au chat
         self.chat_layout.addWidget(bubble_container)
 
-        # Faire défiler vers le bas après un court délai
-        QTimer.singleShot(50, self.scroll_to_bottom)
-
+        
         # Mettre le focus sur le champ de saisie
         self.folder_name_input.setFocus()
 
@@ -2516,7 +2019,6 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         )
 
         # Faire défiler vers le bas
-        QTimer.singleShot(50, self.scroll_to_bottom)
 
     def create_app_skeleton(self, project_type_id=None, technology_id=None):
         """Crée effectivement le squelette d'application en utilisant la commande mkdir"""
@@ -2538,7 +2040,6 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
                 icon_color="#F44336",
                 icon_size=24,
             )
-            QTimer.singleShot(50, self.scroll_to_bottom)
             return
 
         # Créer le répertoire du projet avec la commande mkdir
@@ -2608,7 +2109,6 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             )
 
         # Faire défiler vers le bas
-        QTimer.singleShot(50, self.scroll_to_bottom)
 
     def create_project_structure(self, project_path, project_type_id, technology_id):
         """Crée la structure de base d'un projet en fonction de son type et de sa technologie
@@ -2647,16 +2147,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Ajouter des boutons de confirmation
         self.add_path_confirmation_buttons()
 
-        # Faire défiler vers le bas après un court délai pour s'assurer que le widget est complètement rendu
-        QTimer.singleShot(50, self.scroll_to_bottom)
-
-    def scroll_to_bottom(self):
-        """Fait défiler la zone de chat vers le bas pour voir le dernier message"""
-        # Utiliser le maximum de la barre de défilement pour aller tout en bas
-        self.scroll.verticalScrollBar().setValue(
-            self.scroll.verticalScrollBar().maximum()
-        )
-
+    
     @Slot(str)
     def update_ia_bubble(self, text):
         self.current_ia_text += text
@@ -2665,9 +2156,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             # Accéder directement au label stocké dans la bulle
             if hasattr(self.ia_bubble, "label"):
                 self.ia_bubble.label.setText(self.current_ia_text)
-        # Faire défiler automatiquement vers le bas pour voir les nouveaux messages
-        self.scroll_to_bottom()
-
+        
     @Slot()
     def handle_ia_finished(self):
         # À la fin, parser les actions et proposer la validation
@@ -2681,9 +2170,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             self.show_action_buttons()
         self.current_ia_text = ""
 
-        # S'assurer que le dernier message est visible
-        self.scroll_to_bottom()
-
+        
         # Sauvegarder la conversation dans l'historique si elle contient des messages
         if len(self.current_conversation) > 0:
             self.save_current_conversation()
@@ -2733,9 +2220,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         action_bubble.actionAccepted.connect(accept)
         action_bubble.actionRejected.connect(refuse)
 
-        # Faire défiler vers le bas
-        self.scroll_to_bottom()
-
+        
     def extract_actions(self, ia_text):
         # Extraction JSON [ ... ] (fiabilise selon format de ton agent)
         import re, json
@@ -2836,9 +2321,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             icon_size=24,
         )
 
-        # Faire défiler vers le bas
-        QTimer.singleShot(50, self.scroll_to_bottom)
-
+        
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

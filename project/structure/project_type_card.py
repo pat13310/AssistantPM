@@ -26,7 +26,7 @@ class ProjectTypeCard(QWidget):
         self._selected = False  # Nouvel attribut pour l'état sélectionné
         
         # Dimensions de la carte
-        self.setFixedSize(200, 70)  # Largeur, hauteur
+        self.setFixedSize(230, 70)  # Largeur, hauteur
         self.setCursor(Qt.PointingHandCursor)
 
         # Layout principal

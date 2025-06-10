@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any
 import warnings
 from PySide6.QtCore import QObject, Signal
-from project.structure.core.state_manager import AppState
+from project.structure.core.qt_state import QtAppState
 
 class LegacyStateAdapter(QObject):
     """Adaptateur pour rediriger les accès aux anciennes variables d'état"""
@@ -9,7 +9,7 @@ class LegacyStateAdapter(QObject):
     # Signal pour tracer les accès legacy
     legacy_access_detected = Signal(str, str)  # property_name, access_type
     
-    def __init__(self, state_manager: AppState, enable_warnings: bool = True):
+    def __init__(self, state_manager: QtAppState, enable_warnings: bool = True):
         super().__init__()
         self.state_manager = state_manager
         self.enable_warnings = enable_warnings
@@ -123,7 +123,7 @@ class ChatArboWidgetMigrationMixin:
     def _initialize_migration(self):
         """Initialise l'adaptateur de migration"""
         # Créer le StateManager
-        self.state_manager = AppState()
+        self.state_manager = QtAppState()
         
         # Créer l'adaptateur legacy
         self.legacy_adapter = LegacyStateAdapter(

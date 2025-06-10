@@ -38,8 +38,10 @@ class ProjectTypesWidget(QWidget):
         
         # Configurer le layout
         self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.setSpacing(5)
+        self.main_layout.setContentsMargins(8, 8, 8, 8)
+        self.main_layout.setSpacing(10)
+
+        
         
     def add_bubble(self, text, is_user=False, extra_properties=None):
         """

@@ -9,11 +9,14 @@ from PySide6.QtWidgets import (
     QSizePolicy
 )
 from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QPixmap, QPainter
+from PySide6.QtSvg import QSvgRenderer
 
 # Import de la fonction utilitaire pour charger les SVG colorés
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# Import direct car désormais dans le même package
 from ui.ui_utils import load_colored_svg
 
 class InputChatBubble(QWidget):
@@ -46,11 +49,9 @@ class InputChatBubble(QWidget):
         Returns:
             QPixmap: L'icône chargée ou None si le fichier n'existe pas
         """
-        from PySide6.QtGui import QPixmap, QPainter
-        from PySide6.QtSvg import QSvgRenderer
-        
+        # Chemin des icônes modifié (remontée d'un niveau de dossier supplémentaire)
         icon_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
             "assets",
             "icons",
             f"{icon_name}.svg",

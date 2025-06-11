@@ -23,6 +23,7 @@ class ProjectAction(Enum):
     OPEN = auto()
     RENAME = auto()
     LIST = auto()
+    SHOW_ACTIONS = auto()  # Pour afficher le panel des actions projet
 
 class DirectoryAction(Enum):
     """Actions spécifiques aux répertoires"""
@@ -68,6 +69,12 @@ class CommandResult:
                 ("aide" in self.original_text.lower() or
                  "help" in self.original_text.lower()))
 
+    @property
+    def is_project_actions_command(self):
+        """Vérifie si la commande est pour afficher les actions projet"""
+        return (self.category == ActionCategory.PROJECT and
+                self.action == ProjectAction.SHOW_ACTIONS)
+
 class ActionType:
     """
     Classe utilitaire pour associer des icônes aux actions
@@ -91,6 +98,7 @@ class ActionType:
                 ProjectAction.OPEN: ("folder", "#2196F3"),
                 ProjectAction.RENAME: ("edit", "#FF9800"),
                 ProjectAction.LIST: ("list", "#9C27B0"),
+                ProjectAction.SHOW_ACTIONS: ("folder-cog", "#607D8B"),
             },
             ActionCategory.DIRECTORY: {
                 DirectoryAction.CREATE: ("folder-plus", "#4CAF50"),
@@ -130,6 +138,7 @@ class CommandProcessor:
             (r"nouveau\s+projet", ActionCategory.PROJECT, ProjectAction.CREATE),
             (r"supprimer\s+(le|un)\s+projet", ActionCategory.PROJECT, ProjectAction.DELETE),
             (r"ouvrir\s+(le|un)\s+projet", ActionCategory.PROJECT, ProjectAction.OPEN),
+            (r"^projet$", ActionCategory.PROJECT, ProjectAction.SHOW_ACTIONS),  # Mot-clé simple "projet"
             # Patterns pour les répertoires
             (r"créer\s+(un|le)\s+(répertoire|dossier)", ActionCategory.DIRECTORY, DirectoryAction.CREATE),
             (r"nouveau\s+(répertoire|dossier)", ActionCategory.DIRECTORY, DirectoryAction.CREATE),

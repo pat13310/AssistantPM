@@ -255,8 +255,9 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         self.chat_panel = ChatPanel()
 
         # Connecter les signaux du chat_panel aux méthodes de la fenêtre principale
-        self.chat_panel.message_sent.connect(self.on_message_sent)
+        #self.chat_panel.message_sent.connect(self.on_message_sent)
         self.chat_panel.clear_requested.connect(self.clear_conversation)
+        self.chat_panel.project_name_submitted.connect(self.on_project_name_submitted)
 
         # Reconnexion des signaux de la barre supérieure qui étaient dans l'ancien code
         self.chat_panel.top_bar.exportClicked.connect(self.export_conversation)
@@ -307,60 +308,29 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         Initialise le processeur de commandes
         """
         self.command_processor = CommandProcessor()
-
-    def on_message_sent(self, message_text):
+    
+    def on_project_name_submitted(self, project_name):
         """
-        Gère l'envoi d'un message par l'utilisateur via le composant ChatPanel
+        Gère la soumission du nom de projet depuis InputChatBubble
         """
-        # Vérifier que le message n'est pas vide
-        if not message_text.strip():
-            return
-
-        # Initialiser le processeur de commandes si nécessaire
-        if not hasattr(self, "command_processor"):
-            self.__init_command_processor()
-
-        # Analyser le message pour détecter les commandes
-        cmd_result = self.command_processor.process_command(message_text)
-
-        # Traiter la commande d'aide spéciale
-        if cmd_result.is_help_command:
-            # Utiliser la méthode du ChatPanel pour afficher les cartes d'aide
-            self.chat_panel.show_help_cards()
-            return
-
-        # Le message utilisateur est déjà ajouté par le ChatPanel
-
-        # Si le serveur n'est pas connecté, afficher un message d'erreur
-        if not self.server_connected:
+        # Stocker le nom du projet
+        self.project_name = project_name
+        
+        # Vérifier si un chemin racine a été sélectionné
+        if not self.path_root:
+            # Aucun chemin sélectionné, demander à l'utilisateur d'en sélectionner un
             self.chat_panel.add_ai_message(
-                "<span style='color: #ff6060;'>Le serveur IA n'est pas connecté. Veuillez vérifier la connexion.</span>"
+                "<span style='color:orange'>Veuillez d'abord sélectionner un dossier dans l'arborescence à gauche pour y créer votre projet.</span>"
             )
             return
 
-        # Ajouter le message à la conversation actuelle
-        self.current_conversation.append({"role": "user", "content": message_text})
-
-        # Vérifier si nous avons une commande à traiter avant d'envoyer à l'IA
-        if cmd_result.is_command:
-            # Récupérer l'icône pour l'action
-            from core.command_processor import ActionType
-
-            action_icon, action_color = ActionType.get_icon_for_action(
-                cmd_result.category, cmd_result.action
-            )
-
-            # Vous pouvez ajouter ici le code pour traiter les différents types de commandes
-            # selon cmd_result.category et cmd_result.action
-            # ...
-
-        # Si ce n'est pas une commande ou après traitement, envoyer à l'IA
-        # Pour l'exemple, ajoutons une réponse simple
-        response = "J'ai reçu votre message: " + message_text
-        self.chat_panel.add_ai_message(response)
-
-        # Ajouter la réponse à la conversation
-        self.current_conversation.append({"role": "assistant", "content": response})
+        # Afficher un message de confirmation sans réinitialiser la conversation
+        confirmation_message = f"<b>Projet '{project_name}' créé.</b><br>Vous pouvez maintenant commencer à travailler sur votre projet."
+        self.chat_panel.add_ai_message(confirmation_message)
+        
+        # Réinitialiser le flag is_creating_project dans ChatPanel
+        self.chat_panel.is_creating_project = False
+        self.file_tree.highlight_tree_view()
 
     def clear_conversation(self):
         """
@@ -467,17 +437,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
                 background-color: #2a2a2a;
                 color: #e0e0e0;
             }
-            /* Exception pour le champ de saisie de message */
-            MessageInputField {
-                background-color: white;
-                color: black;
-                border: 1px solid #e0e0e0;
-                font-weight: bold;
-            }
-            MessageInputField:focus {
-                border: 2px solid #4CAF50;
-                background-color: #f9fff9;
-            }
+            
             QScrollArea {
                 border: none;
                 background-color: transparent;
@@ -623,7 +583,6 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         else:
             # Pour les autres cas de clic sur le TreeView, on ne fait rien de spécial
             pass
-
     
     def on_technology_selected_with_project_type(self, tech_id, project_type_id):
         """Appelé lorsqu'une technologie est sélectionnée dans TechnologiesGrid"""
@@ -1530,132 +1489,6 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
 
         # QTimer.singleShot(100, self.file_tree.highlight_tree_view)
 
-    def add_project_name_input(self):
-        """Ajoute une bulle interactive pour saisir le nom du projet"""
-        # Créer un conteneur pour la bulle
-        bubble_container = QWidget()
-        container_layout = QVBoxLayout(bubble_container)
-        container_layout.setContentsMargins(0, 0, 0, 10)
-
-        # Créer une bulle de chat pour contenir l'input
-        bubble = QFrame()
-        bubble.setObjectName("input_bubble")
-        bubble.setStyleSheet(
-            """
-            QFrame#input_bubble {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(227, 242, 253, 0.8), stop:1 rgba(187, 222, 251, 0.8));
-                border-radius: 10px;
-                border: 3px solid #1976D2;
-                padding: 15px;
-            }
-        """
-        )
-
-        # Layout pour la bulle
-        bubble_layout = QVBoxLayout(bubble)
-        bubble_layout.setContentsMargins(15, 15, 15, 15)
-
-        # Titre de la section avec icône
-        title_layout = QHBoxLayout()
-        title_layout.setContentsMargins(0, 0, 0, 15)
-
-        # Icône de configuration
-        title_icon = QLabel()
-        title_icon.setFixedSize(24, 24)
-        title_icon.setStyleSheet("background: transparent; border: none;")
-        config_pixmap = get_svg_icon("settings", size=24, color="#1976D2")
-        if config_pixmap:
-            title_icon.setPixmap(config_pixmap)
-        title_layout.addWidget(title_icon)
-
-        title_label = QLabel("Configuration du projet")
-        title_label.setStyleSheet(
-            """
-            color: #1976D2; 
-            font-weight: bold; 
-            font-size: 16px;
-            background: transparent;
-        """
-        )
-        title_layout.addWidget(title_label)
-        title_layout.addStretch(1)
-
-        bubble_layout.addLayout(title_layout)
-
-        # Champ de saisie pour le nom du projet
-        input_layout = QHBoxLayout()
-        project_name_label = QLabel("Nom du projet :")
-        project_name_label.setStyleSheet(
-            """
-            color: #1976F2; 
-            font-weight: bold;
-            font-size: 14px;
-            background: transparent;
-        """
-        )
-        input_layout.addWidget(project_name_label)
-
-        self.project_name_input = QLineEdit()
-        self.project_name_input.setPlaceholderText("Entrez le nom de votre projet")
-        self.project_name_input.setStyleSheet(
-            """
-            QLineEdit {
-                border: 2px solid #BBDEFB;
-                border-radius: 6px;
-                padding: 10px;
-                background-color: rgba(255, 255, 255, 0.9);
-                color: #0D47A1;
-                font-size: 14px;
-                selection-background-color: #2196F3;
-                selection-color: white;
-            }
-            QLineEdit:focus {
-                border: 2px solid #2196F3;
-                background-color: white;
-            }
-        """
-        )
-        self.project_name_input.setMinimumHeight(38)
-        input_layout.addWidget(self.project_name_input, 1)  # 1 = stretch factor
-
-        # Bouton de validation
-        confirm_btn = QPushButton("Valider")
-        confirm_btn.setStyleSheet(
-            """
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2196F3, stop:1 #1976D2);
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 25px;
-                font-weight: bold;
-                font-size: 13px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42A5F5, stop:1 #1E88E5);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1976D2, stop:1 #1565C0);
-            }
-        """
-        )
-        confirm_btn.setCursor(Qt.PointingHandCursor)  # Changer le curseur au survol
-        confirm_btn.clicked.connect(self.on_project_name_submitted)
-        input_layout.addWidget(confirm_btn)
-
-        bubble_layout.addLayout(input_layout)
-        container_layout.addWidget(bubble)
-
-        # Ajouter la bulle au chat
-        self.chat_layout.addWidget(bubble_container)
-
-        
-        # Mettre le focus sur le champ de saisie
-        self.project_name_input.setFocus()
-
-        # Connecter la touche Entrée pour soumettre le nom du projet
-        self.project_name_input.returnPressed.connect(self.on_project_name_submitted)
-
     def start_app_skeleton_wizard(self):
         """Démarre l'assistant de création de squelette d'application"""
         # Afficher un message explicatif
@@ -1676,48 +1509,10 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Mettre le focus sur le champ de saisie
         self.input_chat_bubble.project_name_input.setFocus()
 
-    def on_project_name_submitted(self, project_name=None):
-        """Gère la soumission du nom du projet
-
-        Args:
-            project_name (str, optional): Le nom du projet. Si None, le nom sera récupéré depuis self.project_name_input.
-        """
-        # Si project_name n'est pas fourni, le récupérer depuis le champ de saisie
-        if project_name is None and hasattr(self, "project_name_input"):
-            project_name = self.project_name_input.text().strip()
-
-        # Vérifier que le nom n'est pas vide
-        if not project_name:
-            # Afficher un message d'erreur
-            self.add_chat_bubble(
-                "<span style='color:orange'>Veuillez entrer un nom pour votre projet.</span>",
-                is_user=False,
-                icon_name="triangle-alert",
-                icon_color="#ff9000",
-                icon_size=24,
-            )
-            return
-
-        # Stocker le nom du projet
-        self.project_name = project_name
-
-        
-        # Vérifier si un chemin racine a été sélectionné
-        if not self.path_root:
-            # Aucun chemin sélectionné, demander à l'utilisateur d'en sélectionner un
-            self.add_chat_bubble(
-                "<span style='color:orange'>Veuillez d'abord sélectionner un dossier dans l'arborescence à gauche pour y créer votre projet.</span>",
-                is_user=False,
-                icon_name="triangle-alert",
-                icon_color="#ff9000",
-                icon_size=24,
-            )
-            # Faire clignoter le TreeView pour attirer l'attention
-            QTimer.singleShot(500, lambda: self.file_tree.highlight_tree_view())
-
-            # on met un flag pour attendre que l'utilisateur sélectionne un dossier
-            self.wait_for_path = True
-            return
+        # Note : Cette méthode a été supprimée car elle fait doublon avec celle qui existe déjà à la ligne 312
+        # La version activeutilise self.chat_panel.add_ai_message() au lieu de self.add_chat_bubble()
+        self.wait_for_path = True
+        return
 
         # Afficher le chemin complet et demander confirmation avec boutons intégrés
         chemin_complet = os.path.join(self.path_root, self.project_name)

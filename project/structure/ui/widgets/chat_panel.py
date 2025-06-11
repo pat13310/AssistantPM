@@ -22,6 +22,7 @@ from project.structure.top_bar_widget import TopBarWidget
 from project.structure.ui.widgets.help_system import HelpDialog
 from project.structure.ui.widgets.help_card import HelpCard
 from project.structure.ui.widgets.project_types_grid import ProjectTypesGrid
+from project.structure.ui.widgets.project_actions_grid import ProjectActionsGrid
 import os
 
 class ChatPanel(QWidget):
@@ -133,13 +134,15 @@ class ChatPanel(QWidget):
         self.selected_model = ""
     
     @Slot()
-    def _on_send_message(self):
+    def _on_send_message(self, message_text):
         """Gère l'envoi d'un message utilisateur"""
         message_text = self.user_input.toPlainText().strip()
         if message_text:
             self.add_user_message(message_text)
             self.message_sent.emit(message_text)
             self.user_input.clear()
+
+        self.on_message_sent(message_text)
     
     @Slot()
     def _on_clear_clicked(self):
@@ -255,8 +258,9 @@ class ChatPanel(QWidget):
             QFrame#ai_bubble {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #E3F2FD, stop:1 #BBDEFB);
                 border-radius: 15px;
-                border-bottom-left-radius: 5px;
+                border-bottom-left-radius: 0px;
                 padding: 10px;
+                
             }
         """)
         
@@ -279,6 +283,7 @@ class ChatPanel(QWidget):
             color: #0D47A1; 
             font-size: 12px;
             background: transparent;
+            margin-left: 10px;
         """)
         if not word_wrap:
             label.setStyleSheet(label.styleSheet() + "white-space: nowrap;")
@@ -309,6 +314,9 @@ class ChatPanel(QWidget):
         
     def display_project_name_input(self):
         """Affiche une bulle de saisie pour le nom du projet en utilisant InputChatBubble"""
+        # Indiquer qu'on est en mode création de projet pour éviter les messages de bienvenue
+        self.is_creating_project = True
+        
         # Nettoyer le chat si nécessaire
         self._clear_chat_area()
         
@@ -327,11 +335,11 @@ class ChatPanel(QWidget):
         
         # Connecter le signal projectNameSubmitted au signal project_name_submitted de ChatPanel
         # pour le propager vers l'extérieur
-        self.input_chat_bubble.projectNameSubmitted.connect(self.project_name_submitted.emit)
+        self.input_chat_bubble.projectNameSubmitted.connect(self._on_project_name_submitted)
         
         # Faire défiler vers le bas après un court délai
         from PySide6.QtCore import QTimer
-        QTimer.singleShot(50, self.scroll_to_bottom)
+        QTimer.singleShot(50, self._scroll_to_bottom)
         
         # Mettre le focus sur le champ de saisie
         self.input_chat_bubble.project_name_input.setFocus()
@@ -357,6 +365,127 @@ class ChatPanel(QWidget):
         self.help_dialog.back_requested.connect(self._restore_chat_state)
         self.help_dialog.topic_selected.connect(self._on_help_topic_selected)
         
+    def display_project(self):
+        """Affiche la grille d'actions pour les projets (alias pour display_project_actions)"""
+        self.display_project_actions()
+    
+    def display_project_actions(self):
+        """Affiche la grille d'actions pour les projets"""
+        # Sauvegarder l'état actuel du chat
+        self._save_current_chat_state()
+        
+        # Effacer la zone de chat pour afficher les actions du projet
+        self._clear_chat_area()
+        
+        # Créer et afficher la grille d'actions projet
+        self.project_actions_grid = ProjectActionsGrid()
+        self.chat_layout.addWidget(self.project_actions_grid)
+        
+        # Connecter les signaux
+        self.project_actions_grid.back_requested.connect(self._restore_chat_state)
+        self.project_actions_grid.action_selected.connect(self._on_project_action_selected)
+    
+    def _on_project_action_selected(self, action):
+        """Gère la sélection d'une action projet"""
+        action_id = action.get("id", "")
+        
+        # Restaurer l'état du chat
+        #self._restore_chat_state()
+        
+        # Ajouter un message IA pour indiquer l'action choisie
+        self.add_ai_message(f"Vous avez choisi de {action.get('title', 'Action projet')}")
+        
+        # Traiter l'action selon son type
+        if action_id == "create":
+            # Appeler la méthode d'affichage du formulaire de saisie du nom du projet
+            self.display_project_name_input()
+        elif action_id == "edit":
+            # Logique pour modifier un projet
+            self.add_ai_message("Veuillez sélectionner le projet à modifier dans l'arborescence")
+        elif action_id == "delete":
+            # Logique pour supprimer un projet
+            self.add_ai_message("Veuillez sélectionner le projet à supprimer dans l'arborescence")
+        elif action_id == "archive":
+            # Logique pour archiver un projet
+            self.add_ai_message("Veuillez sélectionner le projet à archiver dans l'arborescence")
+        elif action_id == "version":
+            # Logique pour versionner un projet
+            self.add_ai_message("Veuillez sélectionner le projet à versionner dans l'arborescence")
+    
+    def _on_send_message(self, *args):
+        """Récupère le message saisi et l'envoie au traitement"""
+        message = self.user_input.toPlainText().strip()
+        if message:
+            # Effacer l'entrée utilisateur après envoi
+            self.user_input.clear()
+            # Traiter le message
+            self.on_message_sent(message)
+    
+    def __init_command_processor(self):
+        """Initialise le processeur de commandes"""
+        from project.structure.core.command_processor import CommandProcessor
+        self.command_processor = CommandProcessor()
+    
+    @Slot(str)
+    def on_message_sent(self, message_text):
+        """Gère l'envoi d'un message utilisateur"""
+        # Vérifier que le message n'est pas vide
+        if not message_text.strip():
+            return
+            
+        # Initialiser le processeur de commandes si nécessaire
+        if not hasattr(self, "command_processor"):
+            self.__init_command_processor()
+
+        # Analyser le message pour détecter les commandes
+        cmd_result = self.command_processor.process_command(message_text)
+
+        # Traiter la commande d'aide spéciale
+        if cmd_result.is_help_command:
+            # Utiliser la méthode du ChatPanel pour afficher les cartes d'aide
+            self.show_help_cards()
+            return
+            
+        # Traiter la commande projet pour afficher la grille d'actions projet
+        if cmd_result.is_project_actions_command:
+            # Afficher la grille d'actions projet
+            self.display_project()
+            return
+
+        # Le message utilisateur est déjà ajouté par le ChatPanel
+
+        # Si le serveur n'est pas connecté, afficher un message d'erreur
+        if not self.server_connected:
+            self.add_ai_message(
+                "<span style='color: #ff6060;'>Le serveur IA n'est pas connecté. Veuillez vérifier la connexion.</span>"
+            )
+            return
+
+        # Ajouter le message à la conversation actuelle
+        self.current_conversation.append({"role": "user", "content": message_text})
+
+        # Vérifier si nous avons une commande à traiter avant d'envoyer à l'IA
+        if cmd_result.is_command:
+            # Récupérer l'icône pour l'action
+            from core.command_processor import ActionType
+
+            action_icon, action_color = ActionType.get_icon_for_action(
+                cmd_result.category, cmd_result.action
+            )
+
+            # Vous pouvez ajouter ici le code pour traiter les différents types de commandes
+            # selon cmd_result.category et cmd_result.action
+            # ...
+
+        # Si ce n'est pas une commande ou après traitement, envoyer à l'IA
+        # Pour l'exemple, ajoutons une réponse simple
+        response = "J'ai reçu votre message: " + message_text
+        self.chat_panel.add_ai_message(response)
+
+        # Ajouter la réponse à la conversation
+        self.current_conversation.append({"role": "assistant", "content": response})
+        QTimer.singleShot(100, self._scroll_to_bottom)
+    
     def _save_current_chat_state(self):
         """Sauvegarde l'état actuel du chat avant d'afficher l'aide"""
         # Sauvegarder les widgets actuels
@@ -501,23 +630,17 @@ class ChatPanel(QWidget):
         self.project_type_selected.emit(project_type_id)
     
     def _restore_saved_chat_area(self):
-        """Restaure l'état précédent de la zone de chat"""
-        if hasattr(self, "saved_widgets") and self.saved_widgets:
-            for widget in self.saved_widgets:
-                self.chat_layout.addWidget(widget)
-                widget.show()
+        """Restaure les widgets sauvegardés dans la zone de chat"""
+        for widget in self.saved_widgets:
+            self.chat_layout.addWidget(widget)
+            widget.setParent(self.chat_widget)  # Reparenting
+            widget.show()
             
-            # Nettoyer la liste des widgets sauvegardés
-            # pour éviter les duplications lors de futures restaurations
-            saved_copy = self.saved_widgets.copy()
-            self.saved_widgets = []
-            
-            # Faire défiler vers le bas
-            QTimer.singleShot(100, self._scroll_to_bottom)
-        else:
-            # Si pas de widgets sauvegardés, ne rien faire 
-            # (pas de message de bienvenue)
-            pass
+        # Vider la liste sauvegardée
+        self.saved_widgets = []
+        
+        # Faire défiler vers le bas après restauration
+        QTimer.singleShot(100, self._scroll_to_bottom)
     
     def _clear_chat_area(self):
         """Efface la zone de chat sans émettre de signal"""
@@ -943,3 +1066,8 @@ class ChatPanel(QWidget):
             
         except Exception as e:
             print(f"Erreur lors de la sélection d'un type de projet: {str(e)}")
+    
+    def _on_project_name_submitted(self, project_name):
+        """Gère la soumission du nom du projet"""
+        print(f"Nom du projet soumis: {project_name}")
+        self.project_name_submitted.emit(project_name)

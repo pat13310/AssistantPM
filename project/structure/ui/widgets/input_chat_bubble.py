@@ -49,9 +49,12 @@ class InputChatBubble(QWidget):
         Returns:
             QPixmap: L'icône chargée ou None si le fichier n'existe pas
         """
-        # Chemin des icônes modifié (remontée d'un niveau de dossier supplémentaire)
+        # Chemin des icônes vers la racine du projet
+        # Trouver la racine du projet (en remontant au niveau approprié)
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+        
         icon_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+            root_dir,
             "assets",
             "icons",
             f"{icon_name}.svg",
@@ -129,8 +132,11 @@ class InputChatBubble(QWidget):
         bubble.setStyleSheet("""
             QFrame#input_bubble {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(227, 242, 253, 0.8), stop:1 rgba(187, 222, 251, 0.8));
-                border-radius: 10px;
-                border: 3px solid #1976D2;
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+                border-bottom-right-radius: 10px;
+                border-bottom-left-radius: 0px; /* Angle droit en bas à gauche */
+                border: 2px solid #1976D2;
                 padding: 15px;
             }
         """)

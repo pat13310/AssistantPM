@@ -101,7 +101,7 @@ class ProjectCreator:
             readme_path = os.path.join(project_path, "README.md")
             
             if os.path.exists(docs_path) and os.path.exists(tests_path) and os.path.exists(readme_path):
-                return 1  # La structure semble déjà exister
+                return {'status': 1, 'message': 'La structure du projet existe déjà', 'path': project_path, 'error': None}
             
             # Si le nom du projet n'est pas spécifié, utiliser le nom du dossier
             if project_name is None:
@@ -141,10 +141,11 @@ class ProjectCreator:
             elif project_type_id == "cms":
                 create_cms_project(project_path, technology_id, project_name)
                 
-            return 0  # Succès
+            return {'status': 0, 'message': 'Structure du projet créée avec succès', 'path': project_path, 'error': None}
         except Exception as e:
-            print(f"Erreur lors de la création de la structure du projet: {e}")
-            return -1  # Erreur
+            error_msg = str(e)
+            print(f"Erreur lors de la création de la structure du projet: {error_msg}")
+            return {'status': -1, 'message': 'Erreur lors de la création de la structure du projet', 'path': project_path, 'error': error_msg}
     
     @staticmethod
     def _create_common_directories(project_path):

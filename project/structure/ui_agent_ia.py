@@ -379,25 +379,20 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
                 message=""
                 if result_structure['status'] == 0 :
                     # affiche message ia
-                    message=f"<span style='color:#FFFFFF'>La structure du projet <b>{self.project_name}</b> a été créée avec succès.</span>"
+                    message=f"<span>La structure du projet <b>{self.project_name}</b> a été créée avec succès.</span>"
                 elif result_structure['status']==1:
-                    message=f"<span style='color:#FFFFFF'>La structure du projet <b>{self.project_name}</b> existe déjà.</span>"
+                    message=f"<span>La structure du projet <b>{self.project_name}</b> existe déjà.</span>"
                 else:
-                    message=f"<span style='color:#FFFFFF'>Erreur lors de la création de la structure du projet <b>{self.project_name}</b>.</span>"
+                    message=f"<span style='color:#FF00F0'>Erreur lors de la création de la structure du projet <b>{self.project_name}</b>.</span>"
 
                 self.chat_panel.add_ai_message(
                         message,
                         icon_name="folder",
-                        icon_color="#4CAF50",
-                        icon_size=24,
                     )
 
-            # Rafraîchir l'arborescence
-            self.file_tree.refresh_tree_view() 
-            # expande le dossier du projet
-            self.file_tree.select_item(self.selected_project_path)
-            self.file_tree.expand_item(self.selected_project_path)
-            
+            # Sélectionner et mettre en évidence le dossier du projet
+            self.file_tree.update_tree_view_and_select_folder(self.selected_project_path)
+
         else:
             # Pour les autres cas de clic sur le TreeView, on ne fait rien de spécial
             pass
@@ -556,7 +551,6 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
     def on_project_subtype_selected(
         self, subtype_id, project_type_id, technology_id, language_id
     ):
-        """Gère la sélection d'un sous-type de projet"""
         # Désactiver et mettre en évidence les cartes
         for widget in self.findChildren(QWidget):
             if widget.property("project_subtype_bubble") and isinstance(

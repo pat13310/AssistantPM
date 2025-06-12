@@ -116,7 +116,7 @@ class InputChatBubble(QWidget):
         
         # Créer un widget pour contenir la bulle avec une largeur limitée
         bubble_wrapper = QWidget()
-        bubble_wrapper.setFixedWidth(500)  # Largeur réduite de moitié (environ)
+        bubble_wrapper.setFixedWidth(400)  # Largeur réduite de moitié (environ)
         # Définir la politique de taille pour limiter la hauteur au contenu
         bubble_wrapper.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         wrapper_layout = QVBoxLayout(bubble_wrapper)

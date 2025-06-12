@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QGridLayout,
     QLabel,
+    QPlainTextEdit,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt, Signal, Slot, QTimer, QSize
 from PySide6.QtGui import QIcon
@@ -23,6 +25,7 @@ from project.structure.ui.widgets.help_system import HelpDialog
 from project.structure.ui.widgets.help_card import HelpCard
 from project.structure.ui.widgets.project_types_grid import ProjectTypesGrid
 from project.structure.ui.widgets.project_actions_grid import ProjectActionsGrid
+from project.structure.ui.widgets.action_bubble import ActionBubble
 import os
 
 
@@ -220,7 +223,9 @@ class ChatPanel(QWidget):
         project_root = os.path.dirname(
             os.path.dirname(
                 os.path.dirname(
-                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    os.path.dirname(
+                        os.path.dirname(os.path.abspath(__file__))
+                    )
                 )
             )
         )
@@ -348,9 +353,56 @@ class ChatPanel(QWidget):
 
     def _scroll_to_bottom(self):
         """Fait défiler la zone de chat vers le bas"""
-        self.scroll.verticalScrollBar().setValue(
+        # Utiliser QTimer.singleShot pour s'assurer que le défilement se produit après le rendu
+        QTimer.singleShot(0, lambda: self.scroll.verticalScrollBar().setValue(
             self.scroll.verticalScrollBar().maximum()
+        ))
+
+    def add_action_message(
+        self,
+        message,
+        buttons=None,
+        icon_name="user",
+        icon_color="#2196F3",
+        icon_size=20,
+    ):
+        """Ajoute un message avec des boutons d'action
+        
+        Args:
+            message (str): Message à afficher
+            buttons (list): Liste de dictionnaires avec 'text' et 'color' pour chaque bouton
+                           Exemple: [{'text': 'Accepter', 'color': '#4CAF50'}, {'text': 'Refuser', 'color': '#F44336'}]
+            icon_name (str): Nom de l'icône SVG à utiliser
+            icon_color (str): Couleur de l'icône (format CSS)
+            icon_size (int): Taille de l'icône en pixels
+            
+        Returns:
+            ActionBubble: Le widget de la bulle d'action créée
+        """
+        # Valeurs par défaut pour les boutons si non spécifiés
+        if buttons is None:
+            buttons = [
+                {"text": "Accepter", "color": "#4CAF50"},  # Vert
+                {"text": "Refuser", "color": "#F44336"}   # Rouge
+            ]
+            
+        # Créer la bulle d'action
+        action_bubble = ActionBubble(
+            message=message,
+            buttons=buttons,
+            icon_name=icon_name,
+            icon_color=icon_color,
+            icon_size=icon_size,
+            parent=self
         )
+        
+        # Ajouter la bulle au layout de chat
+        self.chat_layout.addWidget(action_bubble)
+        
+        # Faire défiler vers le bas
+        self._scroll_to_bottom()
+        
+        return action_bubble
 
     def display_project_name_input(self):
         """Affiche une bulle de saisie pour le nom du projet en utilisant InputChatBubble"""

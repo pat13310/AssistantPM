@@ -41,12 +41,12 @@ class ChatBubble(QFrame):
             self.setStyleSheet(
                 "background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
                 "stop:0 #4CAF50, stop:1 #388E3C); "
-                "border-radius: 10px; "
-                "margin: 2px; "
-                "padding: 4px; "
+                "border-radius: 12px; "
+                "margin: 3px; "
+                "padding: 8px; "
                 "border: 1px solid #66BB6A;"
                 "font-family: 'Roboto';"
-                "font-size: 11px;"
+                "font-size: 14px;"
                 "color: white;"
             )
         else:
@@ -54,12 +54,12 @@ class ChatBubble(QFrame):
             self.setStyleSheet(
                 "background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
                 "stop:0 #2196F3, stop:1 #1976D2); "
-                "border-radius: 10px; "
-                "margin: 2px; "
-                "padding: 4px; "
+                "border-radius: 12px; "
+                "margin: 3px; "
+                "padding: 8px; "
                 "border: 1px solid #42A5F5;"
                 "font-family: 'Roboto';"
-                "font-size: 11px;"
+                "font-size: 14px;"
                 "color: white;"
             )
 

@@ -137,7 +137,7 @@ class InputChatBubble(QWidget):
                 border-bottom-right-radius: 10px;
                 border-bottom-left-radius: 0px; /* Angle droit en bas à gauche */
                 border: 2px solid #1976D2;
-                padding: 15px;
+                padding: 2px 5px 10px 5px;
             }
         """)
         
@@ -149,7 +149,7 @@ class InputChatBubble(QWidget):
         # Titre de la section avec icône
         title_layout = QHBoxLayout()
         title_layout.setContentsMargins(0, 0, 0, 8)
-        title_layout.setSpacing(6)
+        title_layout.setSpacing(12)
         
         # Icône de configuration
         title_icon = QLabel()

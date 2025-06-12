@@ -16,6 +16,53 @@ class ProjectCreator:
     """Classe pour la création de structures de projets"""
     
     @staticmethod
+    def create_root_directory(project_path):
+        """
+        Crée uniquement le répertoire racine du projet
+        
+        Args:
+            project_path (str): Chemin du répertoire racine à créer
+            
+        Returns:
+            dict: Dictionnaire contenant les informations sur l'état de l'opération
+                  - 'status': Code d'état (0: succès, 1: répertoire existant, -1: erreur)
+                  - 'message': Message décrivant le résultat
+                  - 'path': Chemin du répertoire
+                  - 'error': Message d'erreur (si applicable)
+        """
+        try:
+            if os.path.exists(project_path):
+                if os.path.isdir(project_path):
+                    return {
+                        'status': 1,
+                        'message': 'Le répertoire existe déjà',
+                        'path': project_path,
+                        'error': None
+                    }
+                else:
+                    return {
+                        'status': -1,
+                        'message': 'Le chemin existe mais n\'est pas un répertoire',
+                        'path': project_path,
+                        'error': 'Le chemin spécifié est un fichier'
+                    }
+            
+            os.makedirs(project_path)
+            return {
+                'status': 0,
+                'message': 'Répertoire créé avec succès',
+                'path': project_path,
+                'error': None
+            }
+        except Exception as e:
+            return {
+                'status': -1,
+                'message': 'Erreur lors de la création du répertoire',
+                'path': project_path,
+                'error': str(e)
+            }
+    
+    @staticmethod
     def get_app_types_for_technology(technology):
         """Retourne les types d'applications disponibles pour une technologie donnée"""
         return ProjectDataLoader.get_app_types_for_technology(technology)
@@ -35,44 +82,69 @@ class ProjectCreator:
             project_type_id (str): Identifiant du type de projet
             technology_id (str): Identifiant de la technologie
             project_name (str, optional): Nom du projet. Si None, le nom du dossier sera utilisé.
-        """
-        # Si le nom du projet n'est pas spécifié, utiliser le nom du dossier
-        if project_name is None:
-            project_name = os.path.basename(project_path)
             
-        # Créer les répertoires de base communs à tous les projets
-        ProjectCreator._create_common_directories(project_path)
+        Returns:
+            dict: Dictionnaire contenant le statut de l'opération avec les clés:
+                - status (int): 0 pour succès, 1 pour structure existante, -1 pour erreur
+                - message (str): Message descriptif du résultat
+                - path (str): Chemin du projet
+                - error (str ou None): Message d'erreur si applicable
+        """
+        try:
+            # Vérifier si le répertoire existe
+            if not os.path.exists(project_path):
+                return {'status': -1, 'message': 'Le répertoire racine n\'existe pas', 'path': project_path, 'error': 'Répertoire inexistant'}
+            
+            # Vérifier si la structure semble déjà exister
+            docs_path = os.path.join(project_path, "docs")
+            tests_path = os.path.join(project_path, "tests")
+            readme_path = os.path.join(project_path, "README.md")
+            
+            if os.path.exists(docs_path) and os.path.exists(tests_path) and os.path.exists(readme_path):
+                return 1  # La structure semble déjà exister
+            
+            # Si le nom du projet n'est pas spécifié, utiliser le nom du dossier
+            if project_name is None:
+                project_name = os.path.basename(project_path)
+                
+            # Créer les répertoires de base communs à tous les projets
+            ProjectCreator._create_common_directories(project_path)
+            
+            # Créer README.md
+            ProjectCreator._create_readme(project_path, project_type_id, technology_id, project_name)
         
-        # Créer README.md
-        ProjectCreator._create_readme(project_path, project_type_id, technology_id, project_name)
-        
-        # Créer la structure spécifique en fonction du type de projet
-        if project_type_id == "web":
-            ProjectCreator._create_web_project(project_path, technology_id, project_name)
-        elif project_type_id == "desktop":
-            ProjectCreator._create_desktop_project(project_path, technology_id, project_name)
-        elif project_type_id == "mobile":
-            ProjectCreator._create_mobile_project(project_path, technology_id, project_name)
-        elif project_type_id == "api":
-            ProjectCreator._create_api_project(project_path, technology_id, project_name)
-        elif project_type_id == "library":
-            ProjectCreator._create_library_project(project_path, technology_id, project_name)
-        elif project_type_id == "game":
-            ProjectCreator._create_game_project(project_path, technology_id, project_name)
-        elif project_type_id == "data":
-            ProjectCreator._create_data_project(project_path, technology_id, project_name)
-        elif project_type_id == "iot":
-            ProjectCreator._create_iot_project(project_path, technology_id, project_name)
-        elif project_type_id == "blockchain":
-            ProjectCreator._create_blockchain_project(project_path, technology_id, project_name)
-        elif project_type_id == "ai":
-            ProjectCreator._create_ai_project(project_path, technology_id, project_name)
-        elif project_type_id == "devops":
-            ProjectCreator._create_devops_project(project_path, technology_id, project_name)
-        elif project_type_id == "microservices":
-            ProjectCreator._create_microservices_project(project_path, technology_id, project_name)
-        elif project_type_id == "cms":
-            ProjectCreator._create_cms_project(project_path, technology_id, project_name)
+            # Créer la structure spécifique en fonction du type de projet
+            if project_type_id == "web":
+                ProjectCreator._create_web_project(project_path, technology_id, project_name)
+            elif project_type_id == "desktop":
+                ProjectCreator._create_desktop_project(project_path, technology_id, project_name)
+            elif project_type_id == "mobile":
+                ProjectCreator._create_mobile_project(project_path, technology_id, project_name)
+            elif project_type_id == "api":
+                ProjectCreator._create_api_project(project_path, technology_id, project_name)
+            elif project_type_id == "library":
+                ProjectCreator._create_library_project(project_path, technology_id, project_name)
+            elif project_type_id == "game":
+                ProjectCreator._create_game_project(project_path, technology_id, project_name)
+            elif project_type_id == "data":
+                ProjectCreator._create_data_project(project_path, technology_id, project_name)
+            elif project_type_id == "iot":
+                ProjectCreator._create_iot_project(project_path, technology_id, project_name)
+            elif project_type_id == "blockchain":
+                ProjectCreator._create_blockchain_project(project_path, technology_id, project_name)
+            elif project_type_id == "ai":
+                ProjectCreator._create_ai_project(project_path, technology_id, project_name)
+            elif project_type_id == "devops":
+                create_devops_project(project_path, technology_id, project_name)
+            elif project_type_id == "microservices":
+                create_microservices_project(project_path, technology_id, project_name)
+            elif project_type_id == "cms":
+                create_cms_project(project_path, technology_id, project_name)
+                
+            return 0  # Succès
+        except Exception as e:
+            print(f"Erreur lors de la création de la structure du projet: {e}")
+            return -1  # Erreur
     
     @staticmethod
     def _create_common_directories(project_path):

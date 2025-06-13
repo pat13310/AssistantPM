@@ -9,6 +9,12 @@ en fonction du type de projet et de la technologie choisie.
 
 import os
 import json
+import sys
+
+# Ajouter le répertoire racine du projet au chemin de recherche Python
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+# Maintenant les importations devraient fonctionner
 from project.structure.project_creator_extensions import create_devops_project, create_microservices_project, create_cms_project
 from project.structure.project_data_loader import ProjectDataLoader
 

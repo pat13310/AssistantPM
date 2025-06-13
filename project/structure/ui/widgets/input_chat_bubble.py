@@ -132,11 +132,11 @@ class InputChatBubble(QWidget):
         bubble.setStyleSheet("""
             QFrame#input_bubble {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(227, 242, 253, 0.8), stop:1 rgba(187, 222, 251, 0.8));
-                border-top-left-radius: 10px;
-                border-top-right-radius: 10px;
-                border-bottom-right-radius: 10px;
+                border-top-left-radius: 16px;
+                border-top-right-radius: 16px;
+                border-bottom-right-radius: 16px;
                 border-bottom-left-radius: 0px; /* Angle droit en bas à gauche */
-                border: 2px solid #1976D2;
+                border: 1px solid #1976D2;
                 padding: 2px 5px 10px 5px;
             }
         """)

@@ -154,6 +154,8 @@ class CommandProcessor:
             (r"modifier\s+(un|le)\s+fichier", ActionCategory.FILE, FileAction.EDIT),
             # Patterns pour l'aide
             (r"aide|help", ActionCategory.UI, UIAction.SHOW),
+            # Patterns pour effacer le chat
+            (r"^(clear|clean|effacer|nettoyer)$", ActionCategory.UI, UIAction.CLEAR),
         ]
         
     def extract_parameters(self, text, category, action):

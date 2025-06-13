@@ -26,6 +26,7 @@ from project.structure.ui.widgets.help_card import HelpCard
 from project.structure.ui.widgets.project_types_grid import ProjectTypesGrid
 from project.structure.ui.widgets.project_actions_grid import ProjectActionsGrid
 from project.structure.ui.widgets.action_bubble import ActionBubble
+from project.structure.ui.widgets.message_bubble import MessageBubble
 import os
 
 
@@ -265,9 +266,11 @@ class ChatPanel(QWidget):
         self,
         message,
         word_wrap=True,
-        icon_name="user",
+        icon_name=None,
         icon_color="#2196F3",
         icon_size=20,
+        temporary=False,
+        timeout=2000,
     ):
         """Ajoute un message IA simple dans le chat
 
@@ -279,77 +282,67 @@ class ChatPanel(QWidget):
             icon_size (int, optional): Taille de l'icône. Par défaut 20.
 
         Returns:
-            QWidget: Le widget de la bulle de chat créée
+            MessageBubble: Le widget de la bulle de chat créée
         """
-        # Créer un conteneur pour la bulle
-        bubble_container = QWidget()
-        container_layout = QVBoxLayout(bubble_container)
-        container_layout.setContentsMargins(0, 0, 0, 10)
-
-        # Aligner la bulle à gauche avec un layout horizontal
-        h_layout = QHBoxLayout()
-        h_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Créer un widget pour contenir la bulle
-        bubble = QFrame()
-        bubble.setObjectName("ai_bubble")
-        bubble.setStyleSheet(
-            """
-            QFrame#ai_bubble {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #E3F2FD, stop:1 #BBDEFB);
-                border-radius: 15px;
-                border-bottom-left-radius: 0px;
-                padding: 10px;
-                
-            }
-        """
+        # Créer la bulle de message IA (user=False)
+        message_bubble = MessageBubble(
+            message=message,
+            word_wrap=word_wrap,
+            icon_name=icon_name,
+            icon_color=icon_color,
+            icon_size=icon_size,
+            user=False,
+            parent=self,
+            temporary=temporary,
+            timeout=timeout
         )
-
-        # Layout pour la bulle
-        bubble_layout = QHBoxLayout(bubble)
-        bubble_layout.setContentsMargins(10, 8, 10, 8)
-
-        # Icône SVG vectorielle
-        svg_widget = self._get_svg_icon(icon_name, size=icon_size, color=icon_color)
-        if svg_widget:
-            bubble_layout.addWidget(svg_widget)
-        else:
-            # Fallback si l'icône n'est pas trouvée
-            icon_label = QLabel()
-            icon_label.setFixedSize(icon_size, icon_size)
-            bubble_layout.addWidget(icon_label)
-        # Texte
-        label = QLabel(message)
-        label.setStyleSheet(
-            """
-            color: #0D47A1; 
-            font-size: 12px;
-            background: transparent;
-            margin-left: 10px;
-        """
-        )
-        if not word_wrap:
-            label.setStyleSheet(label.styleSheet() + "white-space: nowrap;")
-        else:
-            label.setWordWrap(True)
-            label.setMinimumWidth(300)
-            label.setMaximumWidth(
-                400
-            )  # Limiter la largeur pour éviter les lignes trop longues
-
-        bubble_layout.addWidget(label)
-
-        h_layout.addWidget(bubble)
-        h_layout.addStretch(1)  # Cela pousse la bulle vers la gauche
-        container_layout.addLayout(h_layout)
-
+        
         # Ajouter la bulle au layout de chat
-        self.chat_layout.addWidget(bubble_container)
-
+        self.chat_layout.addWidget(message_bubble)
+        
         # Faire défiler vers le bas
         self._scroll_to_bottom()
+        
+        return message_bubble
+        
+    def add_user_message(
+        self,
+        message,
+        word_wrap=True,
+        icon_name=None,
+        icon_color="#4CAF50",
+        icon_size=20,
+    ):
+        """Ajoute un message utilisateur simple dans le chat
 
-        return bubble_container
+        Args:
+            message (str): Message à afficher
+            word_wrap (bool, optional): Activer le retour à la ligne automatique. Par défaut True.
+            icon_name (str, optional): Nom de l'icône. Par défaut "user".
+            icon_color (str, optional): Couleur de l'icône. Par défaut "#4CAF50".
+            icon_size (int, optional): Taille de l'icône. Par défaut 20.
+
+        Returns:
+            MessageBubble: Le widget de la bulle de chat créée
+        """
+        # Créer la bulle de message utilisateur (user=True)
+        message_bubble = MessageBubble(
+            message=message,
+            word_wrap=word_wrap,
+            icon_name=icon_name,
+            icon_color=icon_color,
+            icon_size=icon_size,
+            user=True,
+            parent=self
+        )
+        
+        # Ajouter la bulle au layout de chat
+        self.chat_layout.addWidget(message_bubble)
+        
+        # Faire défiler vers le bas
+        self._scroll_to_bottom()
+        
+        return message_bubble
 
     def _scroll_to_bottom(self):
         """Fait défiler la zone de chat vers le bas"""
@@ -357,6 +350,26 @@ class ChatPanel(QWidget):
         QTimer.singleShot(0, lambda: self.scroll.verticalScrollBar().setValue(
             self.scroll.verticalScrollBar().maximum()
         ))
+
+    def clear_chat(self):
+        """Efface tous les messages du chat"""
+        # Supprimer tous les widgets du layout de chat
+        while self.chat_layout.count():
+            # Récupérer le widget à la position 0
+            item = self.chat_layout.itemAt(0)
+            if item:
+                # Récupérer le widget
+                widget = item.widget()
+                if widget:
+                    # Cacher le widget
+                    widget.setParent(None)
+                    # Supprimer le widget
+                    widget.deleteLater()
+                # Supprimer l'item du layout
+                self.chat_layout.removeItem(item)
+        
+        # Ajouter un message de confirmation
+        self.add_ai_message("Le chat a été effacé.", temporary=True, timeout=2000)
 
     def add_action_message(
         self,
@@ -559,13 +572,22 @@ class ChatPanel(QWidget):
             # Afficher la grille d'actions projet
             self.display_project()
             return
+            
+        # Traiter la commande pour effacer le chat
+        from project.structure.core.command_processor import ActionCategory, UIAction
+        if cmd_result.category == ActionCategory.UI and cmd_result.action == UIAction.CLEAR:
+            # Effacer le chat
+            self.clear_chat()
+            return
 
         # Le message utilisateur est déjà ajouté par le ChatPanel
 
         # Si le serveur n'est pas connecté, afficher un message d'erreur
         if not self.server_connected:
             self.add_ai_message(
-                "<span style='color: #ff6060;'>Le serveur IA n'est pas connecté. Veuillez vérifier la connexion.</span>"
+                "<span style='color: #ff6060;'>Le serveur IA n'est pas connecté. Veuillez vérifier la connexion.</span>",
+                temporary=True,
+                timeout=2000,
             )
             return
 

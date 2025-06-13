@@ -64,9 +64,23 @@ class HelpCard(QFrame):
         
         # Icône (si spécifiée)
         if icon_name:
-            # Utilisation directe de QSvgWidget avec load_colored_svg
+            # Utiliser load_colored_svg directement car get_svg_icon n'est pas disponible
             svg_widget = QSvgWidget()
-            svg_widget.load(load_colored_svg(icon_name, color_str="#4CAF50"))  # Couleur verte
+            
+            # Construire le chemin vers l'icône
+            import os
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+            
+            # Vérifier si le nom de l'icône contient déjà l'extension .svg
+            if icon_name and icon_name.lower().endswith('.svg'):
+                icon_file = icon_name
+            else:
+                icon_file = f"{icon_name}.svg" if icon_name else ""
+                
+            if icon_name:
+                icon_path = os.path.join(project_root, "assets", "icons", icon_file)
+                svg_widget.load(load_colored_svg(icon_path, color_str="#4CAF50"))
+            
             svg_widget.setFixedSize(30, 30)  # Icône plus grande
             
             # Créer un conteneur pour l'icône avec alignement central
@@ -192,7 +206,7 @@ class TopicCardGrid(QWidget):
         
         # Titre
         title_label = QLabel("Rubriques d'aide")
-        title_label.setStyleSheet("font-weight: bold; font-size: 16px; color: #333;")
+        title_label.setStyleSheet("font-weight: bold; font-size: 16px; color: #CCC;")
         self.layout.addWidget(title_label)
         
         # Zone pour les rangées de cartes

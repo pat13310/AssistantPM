@@ -210,10 +210,7 @@ class HelpDialog(QWidget):
         
         # Titre
         title_label = QLabel("Aide - Choisissez une rubrique")
-        title_font = QFont()
-        title_font.setBold(True)
-        title_font.setPointSize(14)
-        title_label.setFont(title_font)
+        title_label.setStyleSheet("color: #CCC; font-weight: bold; font-size: 1px;")
         header_layout.addWidget(title_label, 1)  # 1 = stretch factor
         
         main_layout.addLayout(header_layout)
@@ -266,7 +263,7 @@ class HelpDialog(QWidget):
             "ui", 
             "Interface utilisateur", 
             "Découvrez les composants de l'interface et comment les utiliser efficacement.",
-            "layout"
+            "user"
         )
         
         self.topic_cards.add_topic_card(

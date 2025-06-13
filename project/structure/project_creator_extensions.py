@@ -7,6 +7,10 @@ Méthodes supplémentaires pour la création de structures de projets
 
 import os
 import json
+import sys
+
+# Ajouter le répertoire racine du projet au chemin de recherche Python
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 def create_devops_project(project_path, technology_id, project_name):
     """Crée la structure d'un projet DevOps"""

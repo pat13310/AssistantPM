@@ -1,5 +1,9 @@
 import os
 import json
+import sys
+
+# Ajouter le répertoire racine du projet au chemin de recherche Python
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 class ProjectDataLoader:
     """Classe utilitaire pour charger les données de projet depuis un fichier JSON"""

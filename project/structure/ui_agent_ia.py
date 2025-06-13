@@ -1,9 +1,15 @@
 # ui_agent_ia.py
 import sys
-from PySide6.QtWidgets import ( QApplication,QWidget,QVBoxLayout, QHBoxLayout,
-    QSplitter, QFileDialog, QGridLayout,
+from PySide6.QtWidgets import (
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QSplitter,
+    QFileDialog,
+    QGridLayout,
 )
-from PySide6.QtCore import (  Qt,    QThread,    Slot,  QTimer)
+from PySide6.QtCore import Qt, QThread, Slot, QTimer
 from PySide6.QtGui import (
     QPixmap,
     QFont,
@@ -12,14 +18,10 @@ from PySide6.QtGui import (
     QIcon,
     QAction,
     QPainter,
-    QFontMetrics,
-    QDesktopServices,
-    QKeyEvent,
+    
 )
 from PySide6.QtSvg import QSvgRenderer
-import json
 import os
-import datetime
 import uuid
 
 # Import du CommandProcessor
@@ -27,97 +29,25 @@ import sys
 import os
 
 # Ajouter le répertoire parent au chemin d'importation
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+#sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import des classes depuis les fichiers séparés
-from chat_bubble import ChatBubble
-from interactive_chat_bubble import InteractiveChatBubble
-#from input_chat_bubble import InputChatBubble
-from path_confirmation_buttons import PathConfirmationButtons
-from action_confirmation_bubble import ActionConfirmationBubble
 
 from project_creator import ProjectCreator
 from project.structure.core.migration_adapter import ChatArboWidgetMigrationMixin
 
 # Import du FileTreeWidget depuis le module local
-from project.structure.file_tree_widget import (
-    FileTreeWidget,
-    FORBIDDEN_PATHS,
-    SYSTEM_DRIVES,
-)
+from project.structure.file_tree_widget import (  FileTreeWidget,  FORBIDDEN_PATHS, SYSTEM_DRIVES,)
 from project_type_card import ProjectTypeCard
 from project.structure.ui.widgets.chat_panel import ChatPanel
 import sys
 import os
 
+
 # Ajouter le répertoire parent au chemin d'importation
-sys.path.append(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
-from ui.ui_utils import load_colored_svg
+sys.path.append( os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
-def get_svg_icon(icon_name, size=16, color=None):
-    """
-    Fonction utilitaire pour charger une icône SVG et la convertir en QPixmap avec fond transparent
-    en utilisant directement load_colored_svg avec anti-aliasing pour éviter la pixelisation
-
-    Args:
-        icon_name (str): Nom du fichier SVG sans extension
-        size (int): Taille de l'icône en pixels (peut être doublée pour une meilleure qualité)
-        color (str): Couleur à appliquer à l'icône (format CSS, ex: '#4CAF50')
-
-    Returns:
-        QPixmap: L'icône chargée ou None si le fichier n'existe pas
-    """
-    icon_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "assets",
-        "icons",
-        f"{icon_name}.svg",
-    )
-
-    if not os.path.exists(icon_path):
-        print(f"[Erreur] Fichier SVG introuvable : {icon_path}")
-        return None
-
-    try:
-        # Doubler la taille pour un meilleur rendu puis redimensionner
-        render_size = size * 2
-
-        # Créer un QPixmap de la taille doublée avec fond transparent
-        pixmap = QPixmap(render_size, render_size)
-        pixmap.fill(Qt.transparent)
-
-        # Charger le SVG avec la couleur spécifiée
-        svg_data = load_colored_svg(icon_path, color)
-        if svg_data.isEmpty():
-            print(f"[Erreur] SVG vide ou incorrect : {icon_path}")
-            return None
-
-        # Créer un QSvgRenderer pour dessiner le SVG
-        renderer = QSvgRenderer(svg_data)
-
-        # Dessiner le SVG sur le pixmap avec anti-aliasing
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing, True)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
-        painter.setRenderHint(QPainter.TextAntialiasing, True)
-
-        # Dessiner le SVG en utilisant tout l'espace disponible
-        renderer.render(painter)
-        painter.end()
-
-        # Redimensionner à la taille finale avec une transformation lisse
-        if render_size != size:
-            return pixmap.scaled(
-                size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-
-        return pixmap
-    except Exception as e:
-        print(f"[Erreur] Impossible de charger l'icône {icon_name}: {str(e)}")
-        return None
 
 # Import des classes depuis les fichiers séparés
 from project.structure.conversation_manager import ConversationManager
@@ -185,15 +115,13 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         self.chat_panel = ChatPanel()
 
         # Connecter les signaux du chat_panel aux méthodes de la fenêtre principale
-        #self.chat_panel.message_sent.connect(self.on_message_sent)
+        # self.chat_panel.message_sent.connect(self.on_message_sent)
         self.chat_panel.clear_requested.connect(self.clear_conversation)
         self.chat_panel.project_name_submitted.connect(self.on_project_name_submitted)
 
         # Reconnexion des signaux de la barre supérieure qui étaient dans l'ancien code
         self.chat_panel.top_bar.exportClicked.connect(self.export_conversation)
-        #self.chat_panel.top_bar.skeletonClicked.connect(self.start_app_skeleton_wizard)
         self.chat_panel.top_bar.historyClicked.connect(self.show_history)
-        #self.chat_panel.top_bar.infoClicked.connect(self.show_project_info)
         self.chat_panel.top_bar.checkConnectionClicked.connect(
             self.check_server_connection
         )
@@ -231,28 +159,29 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         welcome_message = "<b>Bienvenue dans l'Assistant IA !</b><br><br>Vous pouvez naviguer dans l'arborescence à gauche et discuter avec l'IA à droite.<br>N'hésitez pas à poser des questions ou à demander de l'aide."
         self.chat_panel.add_ai_message(welcome_message)
 
-    
     def on_project_name_submitted(self, project_name):
         """
         Gère la soumission du nom de projet depuis InputChatBubble
         """
         # Stocker le nom du projet
         self.project_name = project_name
-        
+        self.chat_panel.clear_chat() 
         # Vérifier si un chemin racine a été sélectionné
         if not self.path_root:
             # Aucun chemin sélectionné, demander à l'utilisateur d'en sélectionner un
-            self.chat_panel.add_ai_message(
-                "<span style='color:#c9530a'>Veuillez d'abord sélectionner un dossier dans l'arborescence à gauche pour y créer votre projet.</span>"
+            self.bubble_warning_path_project=self.chat_panel.add_ai_message(
+                "<span style='color:#c9530a'>Veuillez d'abord sélectionner un dossier dans l'arborescence à gauche pour y créer votre projet.</span>",
+                
             )
             self.file_tree.highlight_tree_view()
             self.wait_for_path = True
+            
             return
 
         # Afficher un message de confirmation sans réinitialiser la conversation
         confirmation_message = f"<b>Projet '{project_name}' créé.</b><br>Vous pouvez maintenant commencer à travailler sur votre projet."
         self.chat_panel.add_ai_message(confirmation_message)
-        
+
         # Réinitialiser le flag is_creating_project dans ChatPanel
         self.chat_panel.is_creating_project = False
 
@@ -263,11 +192,12 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Réinitialiser la conversation courante
         self.current_conversation = []
         self.current_conversation_id = str(uuid.uuid4())
-
+        # Efface le chat
+        self.chat_panel.clear_chat() 
         # Ajouter un message de bienvenue
         welcome_message = "<b>Nouvelle conversation commencée.</b><br>Comment puis-je vous aider aujourd'hui?"
         self.chat_panel.add_ai_message(welcome_message)
-    
+
     def on_file_operation(self, action, path, success, is_dir):
         """Gère les signaux d'opérations sur les fichiers/dossiers
 
@@ -323,7 +253,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
 
         # Afficher une notification via le ChatPanel
         # Pas besoin de clear_bubbles ici, juste ajouter le nouveau message
-        self.chat_panel.add_ai_message(message)
+        self.chat_panel.add_ai_message(message, temporary=True, timeout=2500)
 
     def on_tree_item_clicked(self, path, is_dir):
         """Gère le clic sur un élément de l'arborescence"""
@@ -348,75 +278,62 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         if hasattr(self, "wait_for_path") and self.wait_for_path:
             # Mettre en évidence l'arborescence avec un timer pour éviter l'exécution immédiate
             QTimer.singleShot(100, self.file_tree.highlight_tree_view)
-
-            # Confirmer que le dossier a bien été sélectionné
-            self.chat_panel.add_ai_message(
-                f"<span >Le dossier <b>{os.path.basename(path)}</b> a été sélectionné pour votre projet.</span>",
-                icon_name="folder",
-            )
+            if self.bubble_warning_path_project:
+                self.bubble_warning_path_project.hide()
+                self.bubble_warning_path_project.deleteLater()
+                self.bubble_warning_path_project = None
             
             # Marquer que nous avons géré l'attente du chemin
             self.wait_for_path = False
             # on creer le repertoire on appelle une classe spécialisée
             result = ProjectCreator.create_root_directory(self.selected_project_path)
             message = ""
-            if result['status'] == 0:
+            if result["status"] == 0:
                 # affiche message ia
-                message = f"<span>Le dossier <b>{os.path.basename(path)}</b> a été créé avec succès pour votre projet.</span>"
-            elif result['status'] == 1:
-                message = f"<span >Le dossier <b>{os.path.basename(path)}</b> existe déjà pour votre projet.</span>"
+                message = f"<span>Le dossier <b>{self.project_name}</b> a été créé avec succès pour votre projet.</span>"
+            elif result["status"] == 1:
+                message = f"<span >Le dossier <b>{self.project_name}</b> existe déjà pour votre projet.</span>"
             else:
                 message = f"<span style='color:#FFFFFF'>Erreur lors de la création du dossier <b>{os.path.basename(path)}</b> pour votre projet: {result['error']}</span>"
 
             self.chat_panel.add_ai_message(
-                    message,
-                    icon_name="folder",
-                )
+                message,
+                icon_name="folder",
+                temporary=True,
+                timeout=2000,
+            )
 
-            if result['status'] == 0 :
+            if result["status"] == 0:
                 # on creer le repertoire on appelle une classe spécialisée
-                result_structure=ProjectCreator.create_project_structure(self.selected_project_path, self.selected_project_type, self.selected_technology, self.project_name)
-                message=""
-                if result_structure['status'] == 0 :
+                result_structure = ProjectCreator.create_project_structure(
+                    self.selected_project_path,
+                    self.selected_project_type,
+                    self.selected_technology,
+                    self.project_name,
+                )
+                message = ""
+                if result_structure["status"] == 0:
                     # affiche message ia
-                    message=f"<span>La structure du projet <b>{self.project_name}</b> a été créée avec succès.</span>"
-                elif result_structure['status']==1:
-                    message=f"<span>La structure du projet <b>{self.project_name}</b> existe déjà.</span>"
+                    message = f"<span>La structure du projet <b>{self.project_name}</b> a été créée avec succès.</span>"
+                elif result_structure["status"] == 1:
+                    message = f"<span>La structure du projet <b>{self.project_name}</b> existe déjà.</span>"
                 else:
-                    message=f"<span style='color:#FF00F0'>Erreur lors de la création de la structure du projet <b>{self.project_name}</b>.</span>"
+                    message = f"<span style='color:#FF00F0'>Erreur lors de la création de la structure du projet <b>{self.project_name}</b>.</span>"
 
                 self.chat_panel.add_ai_message(
-                        message,
-                        icon_name="folder",
-                    )
+                    message,
+                    icon_name="folder",
+                    temporary=True,
+                    timeout=2000,
+                )
 
             # Sélectionner et mettre en évidence le dossier du projet
             self.file_tree.update_tree_view_and_select_folder(self.selected_project_path)
-
+            
         else:
             # Pour les autres cas de clic sur le TreeView, on ne fait rien de spécial
             pass
     
-    
-    def get_project_root_path(self):
-        # Si un chemin est déjà sélectionné, l'utiliser
-        if self.selected_project_path and os.path.isdir(self.selected_project_path):
-            return self.selected_project_path
-
-        # Sinon, demander à l'utilisateur de sélectionner un dossier
-        path = QFileDialog.getExistingDirectory(
-            self,
-            "Sélectionner le dossier racine du projet",
-            os.path.expanduser("~"),
-            QFileDialog.ShowDirsOnly,
-        )
-
-        if path:
-            self.selected_project_path = path
-            return path
-
-        return None
-
     def check_server_connection(self):
         """Démarre un thread pour vérifier la connexion au serveur sans bloquer l'UI"""
         # Créer un thread pour exécuter la vérification en arrière-plan
@@ -447,7 +364,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             )
         except Exception as e:
             print(f"Erreur lors de la mise à jour du statut de connexion : {e}")
-        
+
     def display_project_subtypes(self, project_type_id, technology_id, language_id):
         """Affiche les sous-types de projets spécifiques pour la combinaison choisie"""
         # Nettoyer l'espace de travail actuel directement
@@ -460,7 +377,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         from project.structure.back_button import BackButton
 
         back_button = BackButton("« Retour aux langages")
-        
+
         # Ajouter le bouton au layout
         back_container = QWidget()
         back_layout = QHBoxLayout(back_container)
@@ -547,21 +464,11 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
 
         # Ajouter le conteneur au layout principal
         self.chat_layout.addWidget(project_subtype_container)
-    
+
     def on_project_subtype_selected(
         self, subtype_id, project_type_id, technology_id, language_id
     ):
-        # Désactiver et mettre en évidence les cartes
-        for widget in self.findChildren(QWidget):
-            if widget.property("project_subtype_bubble") and isinstance(
-                widget, ProjectTypeCard
-            ):
-                if widget.property("project_subtype_id") == subtype_id:
-                    widget.set_selected(True)
-                else:
-                    widget.setEnabled(False)
-                    widget.set_selected(False)
-
+        
         # Récupérer les informations du projet
         subtype_name = next(
             (
@@ -579,6 +486,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
 
         # Mise à jour des informations du projet
         self.selected_project_subtype = subtype_id
+        self.selected_project_subtype_name = subtype_name
 
         # Afficher un message de confirmation
         project_type_name = next(
@@ -600,6 +508,20 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         )
         technology_name = lang_data["technology_name"]
         
+        # Créer un message de confirmation pour le chat panel
+        confirmation_message = f"<b>Configuration du projet:</b><br>"
+        confirmation_message += f"Type: <b>{project_type_name}</b><br>"
+        confirmation_message += f"Sous-type: <b>{subtype_name}</b><br>"
+        confirmation_message += f"Technologie: <b>{technology_name}</b><br>"
+        confirmation_message += f"Langage: <b>{language_name}</b><br><br>"
+        confirmation_message += "Veuillez maintenant saisir un nom pour votre projet."
+        
+        # Afficher le message dans le chat panel
+        self.chat_panel.add_ai_message(confirmation_message)
+        
+        # Afficher l'interface de saisie du nom du projet
+        self.chat_panel.display_project_name_input()
+
     def update_tree_view_and_select_folder(self, folder_path):
         """Met à jour la vue d'arborescence et sélectionne un dossier"""
         if not os.path.exists(folder_path):
@@ -607,17 +529,8 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             return
 
         # Utiliser la méthode du composant déporté pour mettre à jour l'arborescence
-        self.file_tree.update_tree_view_and_select_folder(folder_path)    
+        self.file_tree.update_tree_view_and_select_folder(folder_path)
     
-    @Slot(str)
-    def update_ia_bubble(self, text):
-        self.current_ia_text += text
-        # Vérifier si ia_bubble existe et est un ChatBubble
-        if hasattr(self, "ia_bubble") and self.ia_bubble is not None:
-            # Accéder directement au label stocké dans la bulle
-            if hasattr(self.ia_bubble, "label"):
-                self.ia_bubble.label.setText(self.current_ia_text)
-        
     def extract_actions(self, ia_text):
         # Extraction JSON [ ... ] (fiabilise selon format de ton agent)
         import re, json

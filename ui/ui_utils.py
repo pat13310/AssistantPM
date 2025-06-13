@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtCore import QByteArray, Qt, QSize
+from PySide6.QtGui import QPixmap, QPainter
+from PySide6.QtSvg import QSvgRenderer
 import os
 
 

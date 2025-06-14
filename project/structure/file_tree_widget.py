@@ -12,9 +12,7 @@ Optimisations principales :
 """
 
 import os
-from typing import Optional, List, Set
 import locale
-import weakref
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -23,10 +21,8 @@ from PySide6.QtWidgets import (
     QTreeView,
     QLabel,
     QCheckBox,
-    QLineEdit,
     QStyledItemDelegate,
     QStyle,
-    QFileDialog,
     QFileSystemModel,
     QMenu,
     QInputDialog,
@@ -44,14 +40,7 @@ from PySide6.QtCore import (
     QMutex,
     QSettings,
 )
-from PySide6.QtGui import (
-    QColor,
-    QPalette,
-    QBrush,
-    QFont,
-    QIcon,
-    QPixmap
-)
+from PySide6.QtGui import ( QColor, QPalette, QBrush,  QFont,  QIcon, QPixmap)
 
 
 # Configuration optimisée
@@ -334,7 +323,7 @@ class FileTreeWidget(QWidget):
         """Interface utilisateur optimisée"""
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        main_layout.setSpacing(2)
         
         # Layout du chemin
         path_layout = QHBoxLayout()
@@ -343,6 +332,7 @@ class FileTreeWidget(QWidget):
         
         self.path_label = QLabel("Chemin:")
         path_layout.addWidget(self.path_label)
+        path_layout.setContentsMargins(5, 5, 5, 0)
         path_layout.addStretch()
         main_layout.addLayout(path_layout)
         
@@ -492,7 +482,9 @@ class FileTreeWidget(QWidget):
     def on_tree_item_clicked(self, index):
         path = self.get_selected_path()
         if path:
-            self.path_selected.emit(path)
+            self.path_label.setText(f"Chemin: {path}")
+            # Emettre l'événement de sélection du chemin avec timer
+            QTimer.singleShot(100, lambda: self.path_selected.emit(path))
             is_dir = os.path.isdir(path)
             self.item_clicked.emit(path, is_dir)
     

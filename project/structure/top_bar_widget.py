@@ -345,7 +345,7 @@ class TopBarWidget(QFrame):
             
             # Afficher le message d'erreur s'il est fourni, sinon un message générique
             if message:
-                self.status_indicator.setText(f"Non connecté: {message}")
+                self.status_indicator.setText(f"{message}")
             else:
                 self.status_indicator.setText("Non connecté au serveur IA")
             

@@ -5,7 +5,6 @@ Ce module définit les classes pour gérer l'affichage de rubriques d'aide dans 
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QScrollArea, QStackedWidget
 from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QFont
 
 class HelpTopic:
     """Classe représentant une rubrique d'aide"""
@@ -210,7 +209,7 @@ class HelpDialog(QWidget):
         
         # Titre
         title_label = QLabel("Aide - Choisissez une rubrique")
-        title_label.setStyleSheet("color: #CCC; font-weight: bold; font-size: 1px;")
+        title_label.setStyleSheet("color: #CCC; font-weight: bold; font-size: 1px;border:none;")
         header_layout.addWidget(title_label, 1)  # 1 = stretch factor
         
         main_layout.addLayout(header_layout)
@@ -239,7 +238,7 @@ class HelpDialog(QWidget):
         self.content_label.setTextFormat(Qt.RichText)
         self.content_label.setOpenExternalLinks(False)
         self.content_label.linkActivated.connect(self._on_link_activated)
-        self.content_label.setStyleSheet("color: #333; line-height: 1.5;")
+        self.content_label.setStyleSheet("color: #CCC; line-height: 1.5;")
         
         self.content_layout.addWidget(self.content_label)
         self.content_layout.addStretch()

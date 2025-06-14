@@ -24,6 +24,37 @@ def load_colored_svg(path: str, color_str: str = None) -> QByteArray:
     return QByteArray(svg_text.encode("utf-8"))
 
 
+def get_svg_icon(name, size=24, color="#000000"):
+    """
+    Charger et colorer une icône SVG en utilisant load_colored_svg du module ui_utils
+    Utilise une approche très simple et directe
+    """
+    # Chemin de l'icône dans le dossier assets/icons
+    project_icon_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "../..", f"assets/icons/{name}.svg"))
+    
+    if not os.path.exists(project_icon_path):
+        print(f"[Erreur] Icône SVG non trouvée: {name}.svg")
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        return pixmap
+    
+    # Créer un pixmap carré plus grand que nécessaire
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+    
+    # Charger l'image SVG avec la couleur demandée
+    svg_data = load_colored_svg(project_icon_path, color)
+    renderer = QSvgRenderer(svg_data)
+    
+    # Dessiner le SVG sur le pixmap
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    renderer.render(painter)
+    painter.end()
+    
+    return pixmap
+
+
 if __name__ == '__main__':
     import sys
     app = QApplication(sys.argv)

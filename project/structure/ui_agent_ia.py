@@ -9,7 +9,16 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QGridLayout,
 )
-from PySide6.QtCore import Qt, QThread, Slot, QTimer
+from PySide6.QtCore import (
+    Qt,
+    QThread,
+    QTimer,
+    Signal,
+    QObject,
+    QUrl,
+    QSize,
+    QThreadPool,
+)
 from PySide6.QtGui import (
     QPixmap,
     QFont,
@@ -20,16 +29,12 @@ from PySide6.QtGui import (
     QPainter,
     
 )
-from PySide6.QtSvg import QSvgRenderer
 import os
 import uuid
 
-# Import du CommandProcessor
 import sys
 import os
 
-# Ajouter le répertoire parent au chemin d'importation
-#sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import des classes depuis les fichiers séparés
 
@@ -50,7 +55,7 @@ sys.path.append( os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath
 
 
 # Import des classes depuis les fichiers séparés
-from project.structure.conversation_manager import ConversationManager
+from project.structure.managers.conversation_manager import ConversationManager
 from project.structure.connection_worker import ConnectionWorker
 from project.structure.project_creator import ProjectCreator
 
@@ -152,12 +157,12 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         self.current_conversation_id = str(uuid.uuid4())
         self.current_conversation = []
 
-        # Vérifier la connexion au démarrage
-        self.check_server_connection()
-
         # Ajouter un message de bienvenue après avoir initialisé toutes les variables
         welcome_message = "<b>Bienvenue dans l'Assistant IA !</b><br><br>Vous pouvez naviguer dans l'arborescence à gauche et discuter avec l'IA à droite.<br>N'hésitez pas à poser des questions ou à demander de l'aide."
         self.chat_panel.add_ai_message(welcome_message)
+        
+        # Vérifier la connexion au serveur après un court délai pour éviter les problèmes au démarrage
+        QTimer.singleShot(1000, self.check_server_connection)
 
     def on_project_name_submitted(self, project_name):
         """
@@ -335,28 +340,69 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             pass
     
     def check_server_connection(self):
-        """Démarre un thread pour vérifier la connexion au serveur sans bloquer l'UI"""
-        # Créer un thread pour exécuter la vérification en arrière-plan
-        self.connection_thread = QThread()
-        self.connection_worker = ConnectionWorker("http://localhost:8000/health")
-        self.connection_worker.moveToThread(self.connection_thread)
-
-        # Connecter les signaux
-        self.connection_thread.started.connect(self.connection_worker.check_connection)
-        self.connection_worker.connection_result.connect(self.on_connection_result)
-        self.connection_worker.finished.connect(self.connection_thread.quit)
-        self.connection_worker.finished.connect(self.connection_worker.deleteLater)
-        self.connection_thread.finished.connect(self.connection_thread.deleteLater)
-
-        # Démarrer le thread
-        self.connection_thread.start()
+        """Démarre un worker dans le thread pool pour vérifier la connexion au serveur sans bloquer l'UI"""
+        try:
+            # Créer un nouveau worker
+            self.connection_worker = ConnectionWorker("http://localhost:8000/health", timeout=3.0)
+            
+            # Connecter les signaux
+            self.connection_worker.signals.connection_result.connect(self.on_connection_result)
+            self.connection_worker.signals.progress.connect(self.on_connection_progress)
+            self.connection_worker.signals.finished.connect(self._on_connection_finished)
+            
+            # Démarrer le worker dans le thread pool
+            print("Démarrage de la vérification de connexion au serveur...")
+            QThreadPool.globalInstance().start(self.connection_worker)
+        except Exception as e:
+            print(f"Erreur lors du démarrage de la vérification de connexion: {e}")
+            # Gérer l'échec de connexion
+            self.on_connection_result(False, f"Erreur interne: {str(e)}")
+    
+    def _cleanup_connection_thread(self):
+        """Nettoie proprement les ressources de connexion"""
+        # Avec QThreadPool, nous n'avons plus besoin de nettoyer manuellement les threads
+        # Nous devons juste annuler le worker en cours si nécessaire
+        if hasattr(self, 'connection_worker') and self.connection_worker:
+            self.connection_worker.cancel()
+    
+    def _on_connection_finished(self):
+        """Gère la fin du thread de connexion"""
+        # Arrêter le thread proprement
+        if hasattr(self, 'connection_thread') and self.connection_thread:
+            self.connection_thread.quit()
+            self.connection_thread.wait(1000)  # Attendre max 1 seconde
+            
+    def closeEvent(self, event):
+        """Gère la fermeture de l'application en nettoyant les ressources"""
+        # Nettoyer les ressources avant de fermer
+        try:
+            # Annuler toute opération de connexion en cours
+            if hasattr(self, 'connection_worker') and self.connection_worker:
+                print("Annulation des opérations de connexion en cours...")
+                self.connection_worker.cancel()
+                
+            # Avec QThreadPool, nous n'avons pas besoin d'attendre la fin des threads
+            # car ils sont gérés automatiquement par le pool
+        except Exception as e:
+            print(f"Erreur lors du nettoyage des ressources: {e}")
+        
+        # Appeler la méthode closeEvent de la classe parente
+        super().closeEvent(event)
+    
+    def on_connection_progress(self, progress_value):
+        """Gère les mises à jour de progression de la connexion"""
+        # Vous pouvez implémenter ici une barre de progression ou un indicateur
+        # print(f"Progression de la connexion: {progress_value}%")
+        pass
 
     def on_connection_result(self, is_connected, message):
         """Gère le résultat de la vérification de connexion"""
         self.server_connected = is_connected
         try:
-            if hasattr(self, "top_bar") and self.top_bar:
-                self.top_bar.update_connection_status(is_connected, message)
+            # Mettre à jour le statut de connexion dans la barre supérieure
+            # Accès via chat_panel.top_bar car top_bar est un attribut de ChatPanel
+            if hasattr(self, "chat_panel") and self.chat_panel and hasattr(self.chat_panel, "top_bar"):
+                self.chat_panel.top_bar.update_connection_status(is_connected, message)
         except RuntimeError:
             # L'objet a déjà été supprimé, ignorer silencieusement
             print(
@@ -531,19 +577,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Utiliser la méthode du composant déporté pour mettre à jour l'arborescence
         self.file_tree.update_tree_view_and_select_folder(folder_path)
     
-    def extract_actions(self, ia_text):
-        # Extraction JSON [ ... ] (fiabilise selon format de ton agent)
-        import re, json
-
-        m = re.search(r"Actions:\s*(\[.*?\])(?:\s|$)", ia_text, re.DOTALL)
-        if m:
-            try:
-                actions_json = m.group(1)
-                return json.loads(actions_json)
-            except json.JSONDecodeError:
-                return []
-        return []
-
+    
     def export_conversation(self):
         """Exporter la conversation actuelle dans un fichier"""
         ConversationManager.export_conversation(self)

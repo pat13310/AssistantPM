@@ -9,10 +9,12 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QFrame
+    QFrame,
+    QGridLayout,
+    QScrollArea
 )
 from PySide6.QtCore import Qt, Signal, QSize
-from PySide6.QtGui import QIcon, QPixmap, QColor, QPainter, QPen, QLinearGradient
+from PySide6.QtGui import QIcon, QPixmap, QColor, QPainter, QPen, QLinearGradient, QPainterPath
 from PySide6.QtSvgWidgets import QSvgWidget
 
 from project.structure.ui.ui_utils import load_colored_svg
@@ -108,8 +110,8 @@ class HelpCard(QFrame):
         desc_label.setWordWrap(True)
         layout.addWidget(desc_label)
         
-        # Définir une taille fixe pour la carte, plus grande pour accommoder les contenus
-        self.setFixedSize(280, 190)
+        # Définir une taille fixe pour la carte, hauteur encore plus réduite
+        self.setFixedSize(280, 120)
         
     # La méthode _get_icon_pixmap a été supprimée car nous utilisons maintenant QSvgWidget directement
     
@@ -145,8 +147,10 @@ class HelpCard(QFrame):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        # Rectangle principal (ajusté pour laisser de la place à la bordure)
-        # Ajustement plus précis pour que le dégradé et la bordure aient le même arrondi
+        # Définir la même valeur d'arrondi pour tous les éléments
+        radius = 10  # Valeur d'arrondi commune
+        
+        # Rectangle principal (sans ajustement pour éviter les bordures blanches)
         rect = self.rect().adjusted(1, 1, -1, -1)
         
         # Couleur de fond avec dégradé
@@ -179,14 +183,20 @@ class HelpCard(QFrame):
             # Bordure verte pour l'état survolé
             painter.setPen(QPen(QColor(self.color), 1))
         else:
-            # Bordure blanche pour l'état normal
-            painter.setPen(QPen(QColor(255, 255, 255), 1))
+            # Bordure transparente pour l'état normal (pas de trait visible)
+            painter.setPen(QPen(QColor(255, 255, 255, 0), 0))
             
-        # Définir la même valeur d'arrondi pour tous les éléments
-        radius = 8  # Valeur d'arrondi commune
-        
         # Dessiner le rectangle principal avec coins arrondis
-        painter.drawRoundedRect(rect, radius, radius)
+        # Utiliser un QPainterPath pour un meilleur contrôle des bords et du dégradé
+        path = QPainterPath()
+        path.addRoundedRect(rect, radius, radius)
+        
+        # Appliquer le dégradé au chemin pour assurer que les bords et le dégradé sont parfaitement alignés
+        painter.fillPath(path, gradient)
+        
+        # Dessiner la bordure si nécessaire
+        if self._selected or self._hovered:
+            painter.drawPath(path)
 
 
 class TopicCardGrid(QWidget):

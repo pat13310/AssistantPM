@@ -179,8 +179,8 @@ class ProjectTypeCard(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        # Rectangle principal (ajusté pour laisser de la place à la bordure)
-        rect = self.rect().adjusted(0, 0, -1, -1)
+        # Rectangle principal (sans ajustement pour éviter les bordures visibles)
+        rect = self.rect()
         
         # Couleur de fond avec dégradé
         gradient = QLinearGradient(0, 0, 0, rect.height())
@@ -208,9 +208,12 @@ class ProjectTypeCard(QWidget):
         if self._selected:
             # Bordure verte vive pour l'état sélectionné
             painter.setPen(QPen(QColor(self.color), 2))
+        elif self._hovered:
+            # Bordure légère pour l'état survolé
+            painter.setPen(QPen(QColor(70, 75, 85, 100), 1))
         else:
-            # Bordure subtile pour les états non sélectionnés
-            painter.setPen(QPen(QColor(50, 55, 65), 1))
+            # Bordure invisible pour l'état normal
+            painter.setPen(QPen(QColor(50, 55, 65, 0), 0))
             
         # Dessiner le rectangle principal avec coins arrondis
         painter.drawRoundedRect(rect, 6, 6)

@@ -2,12 +2,12 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QComboBox,
     QPushButton,
     QSizePolicy,
     QWidget
 )
-from PySide6.QtCore import Signal, QSize, QThread, QObject, Qt, QTimer, QRectF
+from project.structure.ui.widgets.status_combo_box import StatusComboBox
+from PySide6.QtCore import Signal, QSize, QThread, QObject, Qt, QTimer, QRectF, QThreadPool
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 import os
@@ -17,74 +17,14 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from ui.ui_utils import load_colored_svg
 
-class ConnectionWorker(QObject):
-    """Travailleur pour gérer la connexion au serveur IA en arrière-plan"""
-    
-    # Signaux pour communiquer avec le thread principal
-    connection_result = Signal(bool, str)  # connexion réussie, url_serveur
-    finished = Signal()
-    progress = Signal(int)  # Signal de progression (0-100)
-    
-    def __init__(self, server_url=None):
-        super().__init__()
-        self.server_url = server_url
-        self.is_cancelled = False
-    
-    def check_connection(self):
-        """Vérifie la connexion au serveur IA en arrière-plan avec yield pour éviter le blocage"""
-        try:
-            # Émettre le signal de début de progression
-            self.progress.emit(10)
-            
-            # Utiliser QTimer.singleShot pour céder le contrôle à l'interface utilisateur
-            # et éviter de bloquer le thread principal
-            from PySide6.QtCore import QEventLoop
-            loop = QEventLoop()
-            QTimer.singleShot(10, loop.quit)  # Céder le contrôle pendant 10ms
-            loop.exec()
-            
-            self.progress.emit(30)
-            
-            # Simuler une vérification de connexion en plusieurs étapes
-            # pour permettre à l'interface de rester réactive
-            import time
-            
-            # Utiliser des petites pauses au lieu d'une longue pause
-            for i in range(5):
-                if self.is_cancelled:
-                    break
-                    
-                # Pause courte
-                time.sleep(0.1)
-                
-                # Céder le contrôle à nouveau
-                loop = QEventLoop()
-                QTimer.singleShot(10, loop.quit)
-                loop.exec()
-                
-                # Mettre à jour la progression
-                self.progress.emit(40 + i*10)
-            
-            # Ici, ajoutez votre logique de vérification de connexion réelle
-            # Par exemple, une requête HTTP vers le serveur IA
-            
-            self.progress.emit(95)
-            
-            # Si la connexion réussit
-            self.connection_result.emit(True, self.server_url)
-            self.progress.emit(100)
-            
-        except Exception as e:
-            # En cas d'échec, émettre un signal avec False
-            self.connection_result.emit(False, str(e))
-        finally:
-            # Toujours émettre le signal de fin pour nettoyer le thread
-            self.finished.emit()
-    
-    def cancel(self):
-        """Annule la vérification de connexion en cours"""
-        self.is_cancelled = True
+# Importer ConnectionWorker depuis le module dédié
+from project.structure.connection_worker import ConnectionWorker
 
+# Constantes pour les couleurs de statut
+STATUS_ERROR = "#FF0000"  # Rouge
+STATUS_OK = "#4CAF50"     # Vert
+STATUS_RESET = "#808080"  # Gris
+STATUS_PENDING = "#FFA500"  # Orange (pour les vérifications en cours)
 
 def get_svg_icon(name, size=24, color="#000000"):
     """
@@ -154,12 +94,17 @@ class TopBarWidget(QFrame):
 
         # Partie gauche : statut de connexion
         status_layout = QHBoxLayout()
-
-
-        self.status_indicator = QLabel("")
-        self.status_indicator.setStyleSheet(
-            "color: #fff;border: none;"
-        )
+        status_layout.setSpacing(5)
+        
+        # Icône de statut
+        self.status_icon = QLabel()
+        self.status_icon.setFixedSize(24, 24)
+        self.status_icon.setStyleSheet("border: none;")
+        status_layout.addWidget(self.status_icon)
+        
+        # Texte de statut
+        self.status_indicator = QLabel("Non connecté")
+        self.status_indicator.setStyleSheet(f"color: {STATUS_RESET}; font-weight: normal; border: none;")
         status_layout.addWidget(self.status_indicator)
 
         top_bar_layout.addLayout(status_layout)
@@ -172,11 +117,12 @@ class TopBarWidget(QFrame):
             "color: #e0e0e0;border: none; background: transparent;"
         )
         model_layout.addWidget(lb)
-        self.model_choice = QComboBox()
+        
+        # Utiliser StatusComboBox au lieu de QComboBox
+        self.model_choice = StatusComboBox()
         self.model_choice.addItems(["OpenAI", "DeepSeek"])
         self.model_choice.setFixedWidth(120)
         self.model_choice.setFixedHeight(30)
-        self.model_choice.setStyleSheet("font-weight: normal;")
         self.model_choice.currentTextChanged.connect(self.on_model_changed)
         model_layout.addWidget(self.model_choice)
 
@@ -281,64 +227,50 @@ class TopBarWidget(QFrame):
         top_bar_layout.addWidget(self.check_connection_btn)
 
     def check_connection_async(self):
-        """Vérifie la connexion au serveur IA de manière asynchrone sans bloquer l'interface"""
-        # Modifier l'icône pour indiquer que la vérification est en cours
-        connecting_pixmap = get_svg_icon("loader", size=24, color="#FFA500")
-        if connecting_pixmap:
-            self.status_icon.setPixmap(connecting_pixmap)
-        self.status_indicator.setText("Vérification de la connexion...")
-        self.status_indicator.setStyleSheet("color: #FFA500; font-weight: bold; border: none;")
-        
-        # Nettoyer proprement avant de créer un nouveau thread
-        self.cleanup_connection_thread()
-        
-        # Créer un nouveau thread avec priorité IDLE pour éviter d'interférer avec l'interface
-        # IDLE est la priorité la plus basse possible, utilisée uniquement quand le CPU est inactif
-        self.connection_thread = QThread()
-        self.connection_thread.setPriority(QThread.IdlePriority)  # Priorité la plus basse
-        
-        # Créer un nouveau travailleur
-        self.connection_worker = ConnectionWorker(server_url="http://localhost:5000")
-        self.connection_worker.moveToThread(self.connection_thread)
-        
-        # Connecter le signal de progression pour mettre à jour l'interface
-        self.connection_worker.progress.connect(self.on_connection_progress)
-        
-        # Connecter les autres signaux avec Qt.QueuedConnection pour éviter les blocages
-        self.connection_thread.started.connect(
-            self.connection_worker.check_connection, 
-            type=Qt.QueuedConnection
-        )
-        self.connection_worker.finished.connect(
-            self.connection_thread.quit, 
-            type=Qt.QueuedConnection
-        )
-        self.connection_worker.connection_result.connect(
-            self.on_connection_result, 
-            type=Qt.QueuedConnection
-        )
-        
-        # Démarrer le thread après un délai plus long pour s'assurer que l'interface a le temps de se mettre à jour
-        QTimer.singleShot(200, self.connection_thread.start)
-        
-        # Émettre le signal pour informer les composants parents (sans attendre le résultat)
-        QTimer.singleShot(50, self.checkConnectionClicked.emit)
+        """Vérifie la connexion au serveur de manière asynchrone avec QThreadPool"""
+        try:
+            # Nettoyer les ressources précédentes si nécessaire
+            self.cleanup_connection_thread()
+            
+            
+            # Mettre à jour l'indicateur de statut en attente
+            self.status_indicator.setText("Vérification de la connexion...")
+            self.status_indicator.setStyleSheet(f"color: {STATUS_PENDING}; font-weight: bold; border: none;")
+            
+            # Créer un nouveau worker
+            self.connection_worker = ConnectionWorker("http://localhost:8000/health", timeout=3.0)
+            
+            # Connecter les signaux
+            self.connection_worker.signals.connection_result.connect(self.on_connection_result)
+            self.connection_worker.signals.progress.connect(self.on_connection_progress)
+            self.connection_worker.signals.finished.connect(self.on_connection_finished)
+            
+            # Démarrer le worker dans le thread pool
+            print("Démarrage de la vérification de connexion au serveur...")
+            QThreadPool.globalInstance().start(self.connection_worker)
+            
+            # Émettre le signal pour informer les composants parents
+            self.checkConnectionClicked.emit()
+        except Exception as e:
+            print(f"Erreur lors de la vérification de connexion: {e}")
+            self.update_connection_status(False, f"Erreur: {str(e)}")
+            # Émettre le signal pour informer les composants parents
+            self.connection_status_changed.emit(False, f"Erreur interne: {str(e)}")
     
     def cleanup_connection_thread(self):
-        """Nettoie proprement le thread de connexion existant"""
-        if hasattr(self, 'connection_thread') and self.connection_thread and self.connection_thread.isRunning():
-            # Déconnecter tous les signaux
-            try:
-                self.connection_thread.started.disconnect()
-                if self.connection_worker:
-                    self.connection_worker.finished.disconnect()
-                    self.connection_worker.connection_result.disconnect()
-            except Exception:
-                pass  # Ignorer les erreurs si les signaux ne sont pas connectés
-            
-            # Arrêter le thread proprement
-            self.connection_thread.quit()
-            self.connection_thread.wait(500)  # Attendre max 500ms
+        """Nettoie proprement les ressources de connexion"""
+        # Réinitialiser le style de l'indicateur de statut
+        self.status_indicator.setStyleSheet(f"color: {STATUS_RESET}; font-weight: normal; border: none;")
+        
+        # Avec QThreadPool, nous n'avons plus besoin de nettoyer manuellement les threads
+        # Nous devons juste annuler le worker en cours si nécessaire
+        if hasattr(self, 'connection_worker') and self.connection_worker:
+            self.connection_worker.cancel()
+    
+    def on_connection_finished(self):
+        """Gère la fin de la vérification de connexion"""
+        print("Vérification de connexion terminée")
+        # Rien de spécial à faire ici car QThreadPool gère automatiquement le nettoyage
     
     def on_connection_progress(self, percentage):
         """Met à jour l'interface utilisateur avec la progression de la connexion"""
@@ -348,13 +280,16 @@ class TopBarWidget(QFrame):
         # Optionnellement, on pourrait ajouter une barre de progression ici
         # mais pour l'instant on se contente de mettre à jour le texte
     
-    def on_connection_result(self, is_connected, server_url):
+    def on_connection_result(self, is_connected, message):
         """Traite le résultat de la vérification de connexion"""
-        # Mettre à jour l'interface utilisateur
-        self.update_connection_status(is_connected, server_url)
+        # Mettre à jour l'interface utilisateur avec le résultat
+        self.update_connection_status(is_connected, message)
         
         # Émettre le signal pour informer les composants parents
-        self.connection_status_changed.emit(is_connected, server_url)
+        self.connection_status_changed.emit(is_connected, message)
+        
+        # Configurer un timer pour effacer le message après 3 secondes
+        QTimer.singleShot(3000, self.reset_status_message)
     
     def update_selected_path(self, path, is_dir=True):
         """
@@ -369,7 +304,6 @@ class TopBarWidget(QFrame):
         emoji = '📁'
         if len(path) <= 3 and (path.endswith(':') or path.endswith(':/') or path.endswith(':\\')):
             display_path = full_path
-            #emoji = '📁'  # Emoji disque dur pour les lecteurs
         else:
             display_path = os.path.basename(path)
             #emoji = '📁' if is_dir else '📄'  
@@ -391,24 +325,43 @@ class TopBarWidget(QFrame):
         except Exception as e:
             print(f"Erreur lors de la mise à jour du chemin : {e}")
     
-    def update_connection_status(self, is_connected, server_url=None):
-        """
-        Mettre à jour l'indicateur de statut de connexion au niveau de la combobox
-        
-        Args:
-            is_connected (bool): True si connecté, False sinon
-            server_url (str, optional): URL du serveur connecté
-        """
+    def update_connection_status(self, is_connected, message=""):
+        """Met à jour l'indicateur de statut en fonction de l'état de connexion"""
         if is_connected:
-            # Afficher un indicateur vert près de la combobox Modèle IA
-            self.model_choice.setStyleSheet("font-weight: normal; border-left: 4px solid #4CAF50;")
-        else:
-            # Afficher un indicateur rouge près de la combobox Modèle IA
-            self.model_choice.setStyleSheet("font-weight: normal; border-left: 4px solid #d32f2f;")
+            # Connexion réussie - afficher une icône verte
+            status_pixmap = get_svg_icon("check-circle", size=24, color=STATUS_OK)
+            if status_pixmap:
+                self.status_icon.setPixmap(status_pixmap)
+            self.status_indicator.setText("Connecté au serveur IA")
+            self.status_indicator.setStyleSheet(f"color: {STATUS_OK}; font-weight: bold; border: none;")
             
-        # Émettre le signal de changement de statut
-        self.connection_status_changed.emit(is_connected, server_url if server_url else "")
+            # Mettre à jour le statut de la StatusComboBox pour indiquer une connexion réussie
+            self.model_choice.setStatusOk()
+        else:
+            # Connexion échouée - afficher une icône rouge
+            status_pixmap = get_svg_icon("alert-circle", size=24, color=STATUS_ERROR)
+            if status_pixmap:
+                self.status_icon.setPixmap(status_pixmap)
+            
+            # Afficher le message d'erreur s'il est fourni, sinon un message générique
+            if message:
+                self.status_indicator.setText(f"Non connecté: {message}")
+            else:
+                self.status_indicator.setText("Non connecté au serveur IA")
+            
+            self.status_indicator.setStyleSheet(f"color: {STATUS_ERROR}; font-weight: bold; border: none;")
+            
+            # Mettre à jour le statut de la StatusComboBox pour indiquer une connexion échouée
+            self.model_choice.setStatusError()
 
+    def reset_status_message(self):
+        """Efface le message de statut et remet l'interface à l'état normal"""
+        # Effacer le texte du statut
+        self.status_indicator.setText("")
+
+        self.status_indicator.setStyleSheet(f"color: {STATUS_RESET}; font-weight: normal; border: none;")
+        
+        
     def get_selected_model(self):
         """Retourne le modèle IA actuellement sélectionné"""
         return self.model_choice.currentText()

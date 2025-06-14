@@ -10,24 +10,18 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QFrame,
     QPushButton,
-    QGridLayout,
     QLabel,
-    QPlainTextEdit,
     QSizePolicy,
 )
 from PySide6.QtCore import Qt, Signal, Slot, QTimer, QSize
 from PySide6.QtGui import QIcon
 
 from project.structure.ui.widgets.message_input import MessageInputField
-from project.structure.chat_bubble import ChatBubble
 from project.structure.top_bar_widget import TopBarWidget
 from project.structure.ui.widgets.help_system import HelpDialog
-from project.structure.ui.widgets.help_card import HelpCard
-from project.structure.ui.widgets.project_types_grid import ProjectTypesGrid
 from project.structure.ui.widgets.project_actions_grid import ProjectActionsGrid
 from project.structure.ui.widgets.action_bubble import ActionBubble
 from project.structure.ui.widgets.message_bubble import MessageBubble
-import os
 
 
 class ChatPanel(QWidget):
@@ -157,15 +151,17 @@ class ChatPanel(QWidget):
         self.selected_model = ""
 
     @Slot()
-    def _on_send_message(self, message_text):
+    def _on_send_message(self):
         """Gère l'envoi d'un message utilisateur"""
         message_text = self.user_input.toPlainText().strip()
         if message_text:
             self.add_user_message(message_text)
             self.message_sent.emit(message_text)
             self.user_input.clear()
-
-        self.on_message_sent(message_text)
+            
+            # Si la méthode on_message_sent existe, l'appeler
+            if hasattr(self, 'on_message_sent'):
+                self.on_message_sent(message_text)
 
     @Slot()
     def _on_clear_clicked(self):
@@ -184,25 +180,7 @@ class ChatPanel(QWidget):
         """Réaction au changement de modèle"""
         self.selected_model = model_name
 
-    def add_user_message(self, text):
-        """Ajoute un message utilisateur à la conversation avec alignement à droite"""
-        # Créer un conteneur pour placer la bulle complètement à droite
-        container = QWidget()
-        container_layout = QHBoxLayout(container)
-        container_layout.setContentsMargins(0, 0, 0, 0)  # Pas de marges
-        container_layout.addStretch(
-            1
-        )  # Espace extensible à gauche pour pousser vers la droite
-
-        # Créer la bulle utilisateur
-        bubble = ChatBubble(text, True)  # True pour message utilisateur
-
-        # Ajouter la bulle au conteneur avec alignement à droite
-        container_layout.addWidget(bubble, 0, Qt.AlignRight)
-
-        # Ajouter le conteneur au layout principal
-        self.chat_layout.addWidget(container)
-        QTimer.singleShot(100, self._scroll_to_bottom)
+    # Ancienne méthode add_user_message supprimée et remplacée par la version utilisant MessageBubble
 
     def _get_svg_icon(self, icon_name, size=16, color=None):
         """Charge une icône SVG et la retourne comme QSvgWidget
@@ -760,9 +738,21 @@ class ChatPanel(QWidget):
     def _on_help_topic_selected(self, topic):
         """Gère la sélection d'une rubrique d'aide"""
         # Vérifier si c'est la rubrique "Création de projet"
-        if isinstance(topic, dict) and topic.get("title") == "Création de projet":
+        if isinstance(topic, str) and topic == "project":
             # Afficher la grille des types de projets
-            self.display_project_types()
+            self.show_help_cards()
+        elif isinstance(topic, str) and topic=="ui":
+            # Afficher la grille des types de projets
+            self.show_help_cards()
+        elif isinstance(topic, str) and topic=="commands":
+            # Afficher la grille des types de projets
+            self.show_help_cards()
+        elif isinstance(topic, str) and topic=="models":
+            # Afficher la grille des types de projets
+            self.show_help_cards() 
+        #elif isinstance(topic, str) and topic=="coding":
+            # Afficher la grille des types de projets
+        #    self.show_help_cards() 
         else:
             # Pour les autres rubriques, on pourrait ajouter des actions spécifiques ici
             pass

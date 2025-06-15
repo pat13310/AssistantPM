@@ -41,8 +41,8 @@ import os
 from project_creator import ProjectCreator
 from project.structure.core.migration_adapter import ChatArboWidgetMigrationMixin
 
-# Import du FileTreeWidget depuis le module local
-from project.structure.file_tree_widget import (  FileTreeWidget,  FORBIDDEN_PATHS, SYSTEM_DRIVES,)
+# Import du FileTreePanel depuis le module local
+from project.structure.file_tree_panel import (  FileTreePanel,  FORBIDDEN_PATHS, SYSTEM_DRIVES,)
 from project_type_card import ProjectTypeCard
 from project.structure.ui.widgets.chat_panel import ChatPanel
 import sys
@@ -101,20 +101,20 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
 
         splitter = QSplitter(Qt.Horizontal)
 
-        # Utiliser notre composant déporté FileTreeWidget pour l'arborescence
-        self.file_tree = FileTreeWidget()
+        # Utiliser notre composant déporté FileTreePanel pour l'arborescence
+        self.tree_panel = FileTreePanel()
         # Définir le chemin racine après la création si un chemin est fourni
         if root_path:
-            self.file_tree.set_root_path(root_path)
+            self.tree_panel.set_root_path(root_path)
 
         # Connecter les signaux aux slots
-        self.file_tree.item_clicked.connect(self.on_tree_item_clicked)
-        self.file_tree.file_operation.connect(self.on_file_operation)
-        # self.file_tree.item_double_clicked.connect(self.on_tree_item_double_clicked)
-        # self.file_tree.search_text_changed.connect(self.on_tree_search_changed)
+        self.tree_panel.item_clicked.connect(self.on_tree_item_clicked)
+        self.tree_panel.file_operation.connect(self.on_file_operation)
+        # self.tree_panel.item_double_clicked.connect(self.on_tree_item_double_clicked)
+        # self.tree_panel.search_text_changed.connect(self.on_tree_search_changed)
 
         # Widget d'arborescence prêt à être utilisé
-        tree_widget = self.file_tree
+        tree_widget = self.tree_panel
 
         # Chat Area - Utiliser le nouveau composant ChatPanel
         self.chat_panel = ChatPanel()
@@ -178,7 +178,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
                 "<span style='color:#c9530a'>Veuillez d'abord sélectionner un dossier dans l'arborescence à gauche pour y créer votre projet.</span>",
                 
             )
-            self.file_tree.highlight_tree_view()
+            self.tree_panel.highlight_tree_view()
             self.wait_for_path = True
             
             return
@@ -282,7 +282,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
         # Si on attend la sélection d'un dossier pour la création de projet
         if hasattr(self, "wait_for_path") and self.wait_for_path:
             # Mettre en évidence l'arborescence avec un timer pour éviter l'exécution immédiate
-            QTimer.singleShot(100, self.file_tree.highlight_tree_view)
+            QTimer.singleShot(100, self.tree_panel.highlight_tree_view)
             if self.bubble_warning_path_project:
                 self.bubble_warning_path_project.hide()
                 self.bubble_warning_path_project.deleteLater()
@@ -333,7 +333,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
                 )
 
             # Sélectionner et mettre en évidence le dossier du projet
-            self.file_tree.update_tree_view_and_select_folder(self.selected_project_path)
+            self.tree_panel.update_tree_view_and_select_folder(self.selected_project_path)
             
         else:
             # Pour les autres cas de clic sur le TreeView, on ne fait rien de spécial
@@ -575,7 +575,7 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
             return
 
         # Utiliser la méthode du composant déporté pour mettre à jour l'arborescence
-        self.file_tree.update_tree_view_and_select_folder(folder_path)
+        self.tree_panel.update_tree_view_and_select_folder(folder_path)
     
     
     def export_conversation(self):

@@ -262,7 +262,7 @@ class ForbiddenPathDelegate(QStyledItemDelegate):
         return False
 
 
-class FileTreeWidget(QWidget):
+class FileTreePanel(QWidget):
     """Widget d'arborescence optimisé"""
     
     # Signaux inchangés

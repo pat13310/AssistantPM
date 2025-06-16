@@ -1,0 +1,7 @@
+[
+    {"id": "openai", "name": "OpenAI", "description": "API OpenAI (ChatGPT, GPT-4, etc.)", "icon": "brain"},
+    {"id": "anthropic", "name": "Anthropic", "description": "API Anthropic (Claude)", "icon": "bot"},
+    {"id": "google", "name": "Google", "description": "API Google (Gemini)", "icon": "globe"},
+    {"id": "deepseek", "name": "Deepseek", "description": "API Deepseek (Deepseek-Chat)", "icon": "search"},
+    {"id": "local", "name": "Local", "description": "Modèles locaux (Ollama, LM Studio)", "icon": "home"}
+]

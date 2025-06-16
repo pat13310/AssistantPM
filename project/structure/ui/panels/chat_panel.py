@@ -16,12 +16,14 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, Slot, QTimer, QSize
 from PySide6.QtGui import QIcon
 
+from project.structure.back_button import BackButton
 from project.structure.ui.widgets.message_input import MessageInputField
 from project.structure.top_bar_widget import TopBarWidget
 from project.structure.ui.widgets.help_system import HelpDialog
 from project.structure.ui.widgets.project_actions_grid import ProjectActionsGrid
 from project.structure.ui.widgets.action_bubble import ActionBubble
 from project.structure.ui.widgets.message_bubble import MessageBubble
+from project.structure.ui.widgets.settings_ia_widget import SettingsIAWidget
 
 
 class ChatPanel(QWidget):
@@ -436,20 +438,25 @@ class ChatPanel(QWidget):
 
     def _show_help_dialog(self):
         """Affiche le dialogue d'aide avec les cartes de rubriques"""
-        # Effacer temporairement les messages existants pour afficher l'aide
-        # Sauvegarde de l'état actuel des messages
-        self._save_current_chat_state()
+        try:
+            # Effacer temporairement les messages existants pour afficher l'aide
+            # Sauvegarde de l'état actuel des messages
+            self._save_current_chat_state()
 
-        # Effacer la zone de chat pour afficher l'aide
-        self._clear_chat_area()
+            # Effacer la zone de chat pour afficher l'aide
+            self._clear_chat_area()
 
-        # Créer et afficher le dialogue d'aide directement dans la zone de chat
-        self.help_dialog = HelpDialog()
-        self.chat_layout.addWidget(self.help_dialog)
+            # Créer et afficher le dialogue d'aide directement dans la zone de chat
+            self.help_dialog = HelpDialog()
+            self.chat_layout.addWidget(self.help_dialog)
 
-        # Connecter le signal pour retourner à la conversation
-        self.help_dialog.back_requested.connect(self._restore_chat_state)
-        self.help_dialog.topic_selected.connect(self._on_help_topic_selected)
+            # Connecter le signal pour retourner à la conversation
+            self.help_dialog.back_requested.connect(self._restore_chat_state)
+            self.help_dialog.topic_selected.connect(self._on_help_topic_selected)
+        except Exception as e:
+            print(f"Erreur lors de l'affichage du dialogue d'aide: {e}")
+            # En cas d'erreur, restaurer l'état précédent
+            self._restore_chat_state()
 
     def display_project(self):
         """Affiche la grille d'actions pour les projets (alias pour display_project_actions)"""
@@ -748,8 +755,8 @@ class ChatPanel(QWidget):
             # Afficher la grille des types de projets
             self.show_help_cards()
         elif isinstance(topic, str) and topic=="models":
-            # Afficher la grille des types de projets
-            self.show_help_cards() 
+            # Afficher les paramètres d'IA
+            self.display_settings_ia()
         #elif isinstance(topic, str) and topic=="coding":
             # Afficher la grille des types de projets
         #    self.show_help_cards() 
@@ -761,15 +768,85 @@ class ChatPanel(QWidget):
         """Gère la sélection d'un type de projet"""
         # Émettre le signal pour que ui_agent_ia.py puisse le traiter
         self.project_type_selected.emit(project_type_id)
+        
+    def display_settings_ia(self):
+        """Affiche le widget de configuration des paramètres d'IA"""
+        try:
+            # Sauvegarder l'état actuel du chat
+            self._save_current_chat_state()
+            
+            # Effacer la zone de chat
+            self._clear_chat_area()            
+            
+            # Créer le widget de configuration d'IA
+            settings_widget = SettingsIAWidget()
+            
+            # Connecter les signaux aux slots
+            settings_widget.ia_type_selected.connect(self._on_ia_type_selected)
+            settings_widget.ia_model_selected.connect(self._on_ia_model_selected)
+            settings_widget.api_key_saved.connect(self._on_api_key_saved)
+            
+            # Ajouter le widget au layout de chat
+            self.chat_layout.addWidget(settings_widget)
+            
+            # Ajouter un bouton pour revenir en arrière
+            back_button = BackButton("Retour")
+            back_button.setStyleSheet("margin-left:16px; padding: 5px 10px;")
+            back_button.clicked.connect(self._restore_chat_state)
+            
+            # Ajouter le bouton dans un conteneur pour l'aligner à gauche
+            back_container = QWidget()
+            back_layout = QHBoxLayout(back_container)
+            back_layout.setContentsMargins(0, 10, 0, 0)
+            back_layout.addWidget(back_button)
+            back_layout.addStretch(1)
+            
+            self.chat_layout.addWidget(back_container)
+            
+            # Faire défiler vers le bas
+            self._scroll_to_bottom()
+            
+        except Exception as e:
+            print(f"Erreur lors de l'affichage des paramètres d'IA: {str(e)}")
+            # En cas d'erreur, restaurer l'état précédent
+            self._restore_chat_state()
+    
+    def _on_ia_type_selected(self, ia_type_id):
+        """Gère la sélection d'un type d'IA"""
+        print(f"Type d'IA sélectionné: {ia_type_id}")
+        # Ici, vous pourriez sauvegarder le type d'IA sélectionné dans les paramètres
+        
+    def _on_ia_model_selected(self, model_id):
+        """Gère la sélection d'un modèle d'IA"""
+        print(f"Modèle d'IA sélectionné: {model_id}")
+        # Mettre à jour le modèle sélectionné
+        self.selected_model = model_id
+        # Mettre à jour l'affichage dans la barre supérieure
+        if hasattr(self, 'top_bar'):
+            self.top_bar.update_model(model_id)
+            
+    def _on_api_key_saved(self, api_key):
+        """Gère la sauvegarde d'une clé API"""
+        print("Clé API sauvegardée")
+        # Ici, vous pourriez sauvegarder la clé API de manière sécurisée
 
     def _restore_saved_chat_area(self):
         """Restaure les widgets sauvegardés dans la zone de chat"""
+        # Vérifier si les widgets sont valides avant de les restaurer
         for widget in self.saved_widgets:
-            self.chat_layout.addWidget(widget)
-            widget.setParent(self.chat_widget)  # Reparenting
-            widget.show()
-
-        # Vider la liste sauvegardée
+            try:
+                # Vérifier si le widget existe encore et n'est pas détruit
+                if widget and not (hasattr(widget, 'isDestroyed') and widget.isDestroyed()):
+                    # Vérifier si le widget a un parent valide
+                    if hasattr(widget, 'parent') and widget.parent() is not None:
+                        self.chat_layout.addWidget(widget)
+                        widget.setVisible(True)
+            except RuntimeError as e:
+                print(f"Erreur lors de la restauration d'un widget: {e}")
+            except Exception as e:
+                print(f"Exception inattendue lors de la restauration d'un widget: {e}")
+        
+        # Réinitialiser la liste des widgets sauvegardés
         self.saved_widgets = []
 
         # Faire défiler vers le bas après restauration

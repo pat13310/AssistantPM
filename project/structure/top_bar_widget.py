@@ -10,6 +10,7 @@ from project.structure.ui.widgets.status_combo_box import StatusComboBox
 from PySide6.QtCore import Signal, QSize, QThread, QObject, Qt, QTimer, QRectF, QThreadPool
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
+import json
 import os
 import sys
 
@@ -36,9 +37,30 @@ def get_svg_icon(name, size=24, color="#000000"):
     
     if not os.path.exists(project_icon_path):
         print(f"[Erreur] Icône SVG non trouvée: {name}.svg")
-        pixmap = QPixmap(size, size)
-        pixmap.fill(Qt.transparent)
-        return pixmap
+        # Utiliser une icône de secours en fonction du nom demandé
+        fallback_icons = {
+            "alert-circle": "warning",
+            "check-circle": "check",
+            "circle-help": "help"
+        }
+        
+        # Essayer d'utiliser une icône de secours
+        if name in fallback_icons:
+            fallback_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "../..", 
+                                                        f"assets/icons/{fallback_icons[name]}.svg"))
+            if os.path.exists(fallback_path):
+                print(f"[Info] Utilisation de l'icône de secours: {fallback_icons[name]}.svg")
+                project_icon_path = fallback_path
+            else:
+                # Créer un pixmap vide si l'icône de secours n'existe pas non plus
+                pixmap = QPixmap(size, size)
+                pixmap.fill(Qt.transparent)
+                return pixmap
+        else:
+            # Créer un pixmap vide si aucune icône de secours n'est définie
+            pixmap = QPixmap(size, size)
+            pixmap.fill(Qt.transparent)
+            return pixmap
     
     # Créer un pixmap carré plus grand que nécessaire
     pixmap = QPixmap(size, size)
@@ -120,7 +142,23 @@ class TopBarWidget(QFrame):
         
         # Utiliser StatusComboBox au lieu de QComboBox
         self.model_choice = StatusComboBox()
-        self.model_choice.addItems(["OpenAI", "DeepSeek"])
+        
+        # Charger les types d'IA depuis le fichier JSON
+        json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "ia_types.json")
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                ia_types = json.load(f)
+                
+            # Ajouter les types d'IA au combo box avec tooltips
+            for i, ia_type in enumerate(ia_types):
+                self.model_choice.addItem(ia_type["name"])
+                # Ajouter la description comme tooltip
+                self.model_choice.combo_box.setItemData(i, ia_type["description"], Qt.ToolTipRole)
+        except Exception as e:
+            print(f"Erreur lors du chargement des types d'IA: {e}")
+            # Valeurs par défaut en cas d'erreur
+            self.model_choice.addItems(["OpenAI", "Anthropic", "Google", "Deepseek", "Local"])
+        
         self.model_choice.setFixedWidth(120)
         self.model_choice.setFixedHeight(30)
         self.model_choice.currentTextChanged.connect(self.on_model_changed)
@@ -366,6 +404,25 @@ class TopBarWidget(QFrame):
         """Retourne le modèle IA actuellement sélectionné"""
         return self.model_choice.currentText()
 
-    def on_model_changed(self, model_text):
-        """Émission du signal quand le modèle change"""
-        self.modelChanged.emit(model_text)
+    def on_model_changed(self, model_name):
+        """Gère le changement de modèle"""
+        print(f"Modèle changé pour: {model_name}")
+        
+    def update_model(self, model_id):
+        """Met à jour le modèle sélectionné dans la barre supérieure"""
+        # Trouver le texte correspondant à l'ID du modèle
+        model_text = model_id
+        
+        # Vérifier si le modèle existe déjà dans la liste
+        found = False
+        for i in range(self.model_choice.combo_box.count()):
+            if self.model_choice.combo_box.itemText(i) == model_text:
+                self.model_choice.setCurrentIndex(i)
+                found = True
+                break
+        
+        # Si le modèle n'est pas dans la liste, l'ajouter
+        if not found:
+            self.model_choice.addItem(model_text)
+            # Sélectionner le dernier élément ajouté
+            self.model_choice.setCurrentIndex(self.model_choice.combo_box.count() - 1)

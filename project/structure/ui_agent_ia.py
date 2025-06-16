@@ -42,16 +42,15 @@ from project_creator import ProjectCreator
 from project.structure.core.migration_adapter import ChatArboWidgetMigrationMixin
 
 # Import du FileTreePanel depuis le module local
-from project.structure.file_tree_panel import (  FileTreePanel,  FORBIDDEN_PATHS, SYSTEM_DRIVES,)
+from project.structure.ui.panels.file_tree_panel import (  FileTreePanel,  FORBIDDEN_PATHS, SYSTEM_DRIVES,)
 from project_type_card import ProjectTypeCard
-from project.structure.ui.widgets.chat_panel import ChatPanel
+from project.structure.ui.panels.chat_panel import ChatPanel
 import sys
 import os
 
 
 # Ajouter le répertoire parent au chemin d'importation
 sys.path.append( os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
 
 
 # Import des classes depuis les fichiers séparés
@@ -367,10 +366,9 @@ class ChatArboWidget(QWidget, ChatArboWidgetMigrationMixin):
     
     def _on_connection_finished(self):
         """Gère la fin du thread de connexion"""
-        # Arrêter le thread proprement
-        if hasattr(self, 'connection_thread') and self.connection_thread:
-            self.connection_thread.quit()
-            self.connection_thread.wait(1000)  # Attendre max 1 seconde
+        # Avec QThreadPool, nous n'avons pas besoin de nettoyer le thread
+        # car il est géré automatiquement par le pool
+        pass
             
     def closeEvent(self, event):
         """Gère la fermeture de l'application en nettoyant les ressources"""
